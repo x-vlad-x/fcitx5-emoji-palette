@@ -28,6 +28,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           fetch-depth: 0
+      - name: Configure repository ownership
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Create source archive
         run: |
           mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
