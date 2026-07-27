@@ -1,0 +1,11 @@
+/build/
+/build-*/
+/rpmbuild/
+/.cache/
+/.clangd/
+/.idea/
+/.vscode/
+*.rpm
+*.src.rpm
+*.tar.gz
+compile_commands.json
