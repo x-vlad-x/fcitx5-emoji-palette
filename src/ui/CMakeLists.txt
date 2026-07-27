@@ -5,6 +5,7 @@ set(CMAKE_AUTOMOC ON)
 
 add_library(
     emoji-palette-ui
+    STATIC
     emoji_list_model.cpp
     palette_session.cpp
     palette_window.cpp

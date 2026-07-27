@@ -1,6 +1,11 @@
 /build/
 /build-*/
 /rpmbuild/
+/redhat-linux-build/
+/debugfiles.list
+/debugsourcefiles.list
+/debugsources.list
+/elfbins.list
 /.cache/
 /.clangd/
 /.idea/

@@ -97,4 +97,4 @@ void SequenceValidator::reset() {
     lastSequence_ = 0;
 }
 
-} // namespace emoji_palette::ipc
+}

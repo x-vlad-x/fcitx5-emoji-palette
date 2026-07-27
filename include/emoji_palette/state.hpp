@@ -39,4 +39,4 @@ void toggleFavorite(PersistentState& state, std::string_view sequence);
 void recordUse(PersistentState& state, std::string_view sequence, std::int64_t timestamp,
                std::size_t maximumEntries = 100);
 
-} // namespace emoji_palette
+}

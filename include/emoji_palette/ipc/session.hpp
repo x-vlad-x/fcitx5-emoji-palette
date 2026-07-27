@@ -58,4 +58,4 @@ class SequenceValidator {
     std::uint32_t lastSequence_ = 0;
 };
 
-} // namespace emoji_palette::ipc
+}

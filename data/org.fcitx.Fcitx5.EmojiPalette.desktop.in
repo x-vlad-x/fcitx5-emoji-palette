@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Emoji Palette for Fcitx 5
+Comment=Search and insert emoji through Fcitx 5
+Exec=@CMAKE_INSTALL_FULL_LIBEXECDIR@/fcitx5-emoji-palette-ui
+Icon=face-smile
+Terminal=false
+NoDisplay=true
+Categories=Utility;Accessibility;
+Keywords=emoji;picker;input;fcitx;
+StartupNotify=false

@@ -34,4 +34,4 @@ struct PopupPlacement {
 
 PopupPlacement placePopup(const Rect& caret, const Size& popup, const Rect& available);
 
-} // namespace emoji_palette
+}

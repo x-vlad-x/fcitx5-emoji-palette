@@ -34,8 +34,7 @@ class PaletteDbusObject final : public QObject, protected QDBusContext {
                 &PaletteDbusObject::Frame);
     }
 
-  private slots:
-    QByteArray Exchange(const QByteArray& frame) {
+    Q_SLOT QByteArray Exchange(const QByteArray& frame) {
         return session_.exchange(frame, message().service());
     }
 

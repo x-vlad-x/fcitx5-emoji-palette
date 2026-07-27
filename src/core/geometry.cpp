@@ -18,4 +18,4 @@ PopupPlacement placePopup(const Rect& caret, const Size& popup, const Rect& avai
     return {{x, y}, belowCaret};
 }
 
-} // namespace emoji_palette
+}
