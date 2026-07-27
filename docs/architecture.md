@@ -36,6 +36,10 @@ theme integration, screen selection, and layer-shell configuration. It cannot
 commit text and does not need keyboard focus. It receives logical key commands
 from the addon.
 
+The emoji grid uses `QAbstractListModel` with a uniform `QListView` icon layout,
+so delegates are created and painted only for visible cells. Category, search,
+favorite, recent-use, and variant state remains in the non-Qt core model.
+
 On Wayland, LayerShellQt creates a top-layer surface with no exclusive zone and
 `KeyboardInteractivityNone`. On X11, a non-activating frameless tool window is
 used.
@@ -66,6 +70,11 @@ replaced with safe defaults.
    This ordering prevents a second commit.
 7. Any lifecycle invalidation moves the transaction to cancelled and sends
    `Hide`; late responses are ignored.
+
+When close-after-selection is disabled, the committed transaction still
+becomes terminal. The addon immediately creates a new transaction for the same
+still-focused tracked context and sends a new `Show`, allowing another
+selection without making an old `Selected` frame reusable.
 
 ## Dependency boundaries
 

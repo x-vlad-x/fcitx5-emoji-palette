@@ -55,3 +55,32 @@ add_test(
         ${CMAKE_CURRENT_SOURCE_DIR}/unicode_generator_tests.py
         ${PROJECT_SOURCE_DIR}
 )
+
+if(TARGET EmojiPalette::Ui)
+    find_package(Qt6 6.6 REQUIRED COMPONENTS Test)
+    add_executable(helper-tests helper_tests.cpp)
+    set_target_properties(helper-tests PROPERTIES AUTOMOC ON)
+    target_link_libraries(
+        helper-tests
+        PRIVATE
+            EmojiPalette::Ui
+            Qt6::Test
+    )
+    target_compile_features(helper-tests PRIVATE cxx_std_20)
+    target_compile_options(
+        helper-tests
+        PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Wconversion
+            -Wsign-conversion
+            $<$<BOOL:${EMOJI_PALETTE_WARNINGS_AS_ERRORS}>:-Werror>
+    )
+    add_test(NAME helper-tests COMMAND helper-tests)
+    set_tests_properties(
+        helper-tests
+        PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
+endif()

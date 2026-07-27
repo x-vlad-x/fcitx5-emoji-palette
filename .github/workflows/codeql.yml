@@ -29,6 +29,7 @@ jobs:
           cmake -S . -B build -G Ninja
           -DCMAKE_BUILD_TYPE=Debug
           -DEMOJI_PALETTE_BUILD_FCITX_ADDON=OFF
+          -DEMOJI_PALETTE_BUILD_UI=OFF
       - name: Build
         run: cmake --build build --parallel 2
       - uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3

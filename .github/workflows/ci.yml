@@ -57,7 +57,9 @@ jobs:
     name: build-${{ matrix.name }}
     steps:
       - name: Install build dependencies
-        run: dnf install -y cmake ninja-build gcc-c++ clang python3 git fcitx5-devel
+        run: >
+          dnf install -y cmake ninja-build gcc-c++ clang python3 git
+          fcitx5-devel qt6-qtbase-devel qt6-linguist layer-shell-qt-devel
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Configure
         run: |

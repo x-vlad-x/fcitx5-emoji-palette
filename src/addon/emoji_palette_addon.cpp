@@ -119,7 +119,9 @@ FCITX_CONFIGURATION(EmojiPaletteConfig,
                                                     "TriggerKey",
                                                     _("Trigger Key"),
                                                     {fcitx::Key("Super+period")},
-                                                    fcitx::KeyListConstrain()};);
+                                                    fcitx::KeyListConstrain()};
+                    fcitx::Option<bool> closeAfterSelection{this, "CloseAfterSelection",
+                                                            _("Close after selection"), true};);
 
 class EmojiPaletteAddon final : public fcitx::AddonInstance {
   public:
@@ -178,19 +180,20 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
         reloadConfig();
     }
 
-    void reloadConfig() override { fcitx::readAsIni(config_, "conf/emoji-palette.conf"); }
+    void reloadConfig() override { fcitx::readAsIni(config_, "conf/emojipalette.conf"); }
 
     const fcitx::Configuration* getConfig() const override { return &config_; }
 
     void setConfig(const fcitx::RawConfig& config) override {
         config_.load(config, true);
-        fcitx::safeSaveAsIni(config_, "conf/emoji-palette.conf");
+        fcitx::safeSaveAsIni(config_, "conf/emojipalette.conf");
     }
 
   private:
     void show(fcitx::InputContext& context) {
         cancel(CancelReason::User, true);
         origin_ = context.watch();
+        closeAfterSelection_ = *config_.closeAfterSelection;
         const auto transaction = createTransaction();
         controller_.begin(transaction, std::make_unique<FcitxCommitTarget>(context));
         search_.clear();
@@ -251,7 +254,7 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
                                      {0, 0, 0, 0},
                                      currentLocale(),
                                      static_cast<std::uint16_t>(scale),
-                                     true}};
+                                     closeAfterSelection_}};
         sendEnvelope(envelope);
     }
 
@@ -312,7 +315,16 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
         if (const auto* selected = std::get_if<Selected>(&parsed.envelope->payload)) {
             const auto result = controller_.select(*selected);
             if (result == emoji_palette::SelectionResult::Committed) {
-                origin_.unwatch();
+                if (closeAfterSelection_) {
+                    origin_.unwatch();
+                } else if (auto* origin = origin_.get(); origin != nullptr && origin->hasFocus()) {
+                    const auto transaction = createTransaction();
+                    controller_.begin(transaction, std::make_unique<FcitxCommitTarget>(*origin));
+                    commandSequence_ = 0;
+                    sendShow(*origin, transaction);
+                } else {
+                    cancel(CancelReason::FocusLost, true);
+                }
             } else if (result != emoji_palette::SelectionResult::TransactionMismatch &&
                        result != emoji_palette::SelectionResult::Inactive) {
                 cancel(CancelReason::ProtocolError, true);
@@ -356,8 +368,13 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
             event.accept();
             return;
         }
-        if (key.check(FcitxKey_Return) || key.check(FcitxKey_KP_Enter)) {
+        if (key.check(FcitxKey_Return) || key.check(FcitxKey_KP_Enter) ||
+            key.check(FcitxKey_space)) {
             command = CommandKind::Select;
+        } else if (key.check(FcitxKey_d, fcitx::KeyState::Ctrl)) {
+            command = CommandKind::ToggleFavorite;
+        } else if (key.check(FcitxKey_v, fcitx::KeyState::Ctrl)) {
+            command = CommandKind::ShowVariants;
         } else if (key.check(FcitxKey_Left)) {
             command = CommandKind::Left;
         } else if (key.check(FcitxKey_Right)) {
@@ -418,6 +435,7 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
     fcitx::TrackableObjectReference<fcitx::InputContext> origin_;
     std::uint32_t commandSequence_ = 0;
     std::string search_;
+    bool closeAfterSelection_ = true;
 };
 
 class EmojiPaletteAddonFactory final : public fcitx::AddonFactory {
@@ -429,4 +447,4 @@ class EmojiPaletteAddonFactory final : public fcitx::AddonFactory {
 
 }
 
-FCITX_ADDON_FACTORY_V2_BACKWARDS(emoji_palette, EmojiPaletteAddonFactory);
+FCITX_ADDON_FACTORY_V2(emojipalette, EmojiPaletteAddonFactory);

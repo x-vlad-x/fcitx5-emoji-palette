@@ -12,6 +12,7 @@ include(CTest)
 
 option(EMOJI_PALETTE_WARNINGS_AS_ERRORS "Treat project warnings as errors" ON)
 option(EMOJI_PALETTE_BUILD_FCITX_ADDON "Build the Fcitx5 addon" ON)
+option(EMOJI_PALETTE_BUILD_UI "Build the Qt 6 palette helper" ON)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -102,6 +103,10 @@ target_compile_options(
 
 if(EMOJI_PALETTE_BUILD_FCITX_ADDON)
     add_subdirectory(src/addon)
+endif()
+
+if(EMOJI_PALETTE_BUILD_UI)
+    add_subdirectory(src/ui)
 endif()
 
 if(BUILD_TESTING)
