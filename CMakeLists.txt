@@ -42,6 +42,31 @@ target_compile_options(
         $<$<BOOL:${EMOJI_PALETTE_WARNINGS_AS_ERRORS}>:-Werror>
 )
 
+add_library(
+    emoji-palette-ipc
+    src/ipc/protocol.cpp
+    src/ipc/session.cpp
+)
+add_library(EmojiPalette::Ipc ALIAS emoji-palette-ipc)
+target_compile_features(emoji-palette-ipc PUBLIC cxx_std_20)
+target_include_directories(
+    emoji-palette-ipc
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_link_libraries(emoji-palette-ipc PUBLIC EmojiPalette::Core)
+target_compile_options(
+    emoji-palette-ipc
+    PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Wconversion
+        -Wsign-conversion
+        $<$<BOOL:${EMOJI_PALETTE_WARNINGS_AS_ERRORS}>:-Werror>
+)
+
 if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_subdirectory(tests)

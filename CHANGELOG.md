@@ -7,3 +7,5 @@ All notable user-visible changes are documented here.
 - Established the runtime, popup focus, Unicode data, and IPC architecture.
 - Added the official Emoji 17.0 catalog with localized CLDR 48.2 search,
   variants, favorites, recents, keyboard navigation, and popup geometry logic.
+- Added the bounded, versioned IPC contract with peer-owner binding, replay
+  protection, negotiation, and reconnect behavior.

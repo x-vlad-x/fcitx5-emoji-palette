@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<node>
+  <interface name="org.fcitx.Fcitx5.EmojiPalette1">
+    <method name="Exchange">
+      <arg name="request" type="ay" direction="in"/>
+      <arg name="response" type="ay" direction="out"/>
+    </method>
+    <signal name="Frame">
+      <arg name="frame" type="ay"/>
+    </signal>
+  </interface>
+</node>
