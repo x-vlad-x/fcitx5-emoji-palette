@@ -1,0 +1,29 @@
+name: Unicode data
+
+on:
+  pull_request:
+    paths:
+      - data/**
+      - tools/update-unicode-data
+      - tests/unicode_generator_tests.py
+      - .github/workflows/unicode-data.yml
+  workflow_dispatch:
+  schedule:
+    - cron: "41 5 * * 2"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unicode-data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reproducibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Generate from checksummed upstream inputs
+        run: ./tools/update-unicode-data --output "${RUNNER_TEMP}/emoji_data.inc"
+      - name: Compare generated data
+        run: cmp data/generated/emoji_data.inc "${RUNNER_TEMP}/emoji_data.inc"

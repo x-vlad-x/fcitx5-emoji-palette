@@ -1,0 +1,36 @@
+version = 1
+
+[[annotations]]
+path = [
+  ".clang-format",
+  ".clang-tidy",
+  ".editorconfig",
+  ".github/**",
+  ".gitignore",
+  "CMakeLists.txt",
+  "CMakePresets.json",
+  "LICENSE",
+  "README.md",
+  "CHANGELOG.md",
+  "CODE_OF_CONDUCT.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  "SUPPORT.md",
+  "THIRD_PARTY_NOTICES.md",
+  "data/unicode-versions.json",
+  "docs/**",
+  "include/**",
+  "protocol/**",
+  "src/**",
+  "tests/**",
+  "tools/**"
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Vladislav Shadiuk"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+[[annotations]]
+path = "data/generated/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "1991-2026 Unicode, Inc."
+SPDX-License-Identifier = "Unicode-3.0"

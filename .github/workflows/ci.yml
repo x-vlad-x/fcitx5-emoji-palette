@@ -17,11 +17,17 @@ jobs:
   repository-policy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Check whitespace
-        run: git diff --check HEAD^ HEAD
+        run: |
+          if [[ -n "${{ github.base_ref }}" ]]; then
+            base="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          else
+            base="HEAD^"
+          fi
+          git diff --check "$base" HEAD
       - name: Check required architecture records
         run: |
           test -f docs/research.md
@@ -30,3 +36,38 @@ jobs:
           test -f docs/adr/0002-popup-focus-model.md
           test -f docs/adr/0003-emoji-data-source.md
           test -f docs/adr/0004-ipc-protocol.md
+
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: registry.fedoraproject.org/fedora@sha256:a0cddd3b24c82a88ab33d16bac3415e8b66d78a9e2901a16a1d6ba3865bec97e
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: gcc-release
+            compiler: gcc
+            build-type: Release
+          - name: clang-release
+            compiler: clang
+            build-type: Release
+          - name: gcc-debug
+            compiler: gcc
+            build-type: Debug
+    name: build-${{ matrix.name }}
+    steps:
+      - name: Install build dependencies
+        run: dnf install -y cmake ninja-build gcc-c++ clang python3 git
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Configure
+        run: |
+          if [[ "${{ matrix.compiler }}" == "clang" ]]; then
+            export CC=clang CXX=clang++
+          else
+            export CC=gcc CXX=g++
+          fi
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build-type }}
+      - name: Build
+        run: cmake --build build --parallel 2
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
