@@ -42,6 +42,7 @@ target_compile_options(
         -Wpedantic
         -Wconversion
         -Wsign-conversion
+        $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:GNU>>:-O2>
         $<$<BOOL:${EMOJI_PALETTE_WARNINGS_AS_ERRORS}>:-Werror>
 )
 
