@@ -11,6 +11,9 @@ include(GNUInstallDirs)
 include(CTest)
 
 option(EMOJI_PALETTE_WARNINGS_AS_ERRORS "Treat project warnings as errors" ON)
+option(EMOJI_PALETTE_BUILD_FCITX_ADDON "Build the Fcitx5 addon" ON)
+
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_library(
     emoji-palette-core
@@ -39,6 +42,7 @@ target_compile_options(
         -Wpedantic
         -Wconversion
         -Wsign-conversion
+        $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:GNU>>:-O2>
         $<$<BOOL:${EMOJI_PALETTE_WARNINGS_AS_ERRORS}>:-Werror>
 )
 
@@ -66,6 +70,39 @@ target_compile_options(
         -Wsign-conversion
         $<$<BOOL:${EMOJI_PALETTE_WARNINGS_AS_ERRORS}>:-Werror>
 )
+
+add_library(
+    emoji-palette-runtime
+    src/runtime/selection_controller.cpp
+)
+add_library(EmojiPalette::Runtime ALIAS emoji-palette-runtime)
+target_compile_features(emoji-palette-runtime PUBLIC cxx_std_20)
+target_include_directories(
+    emoji-palette-runtime
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)
+target_link_libraries(
+    emoji-palette-runtime
+    PUBLIC
+        EmojiPalette::Core
+        EmojiPalette::Ipc
+)
+target_compile_options(
+    emoji-palette-runtime
+    PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Wconversion
+        -Wsign-conversion
+        $<$<BOOL:${EMOJI_PALETTE_WARNINGS_AS_ERRORS}>:-Werror>
+)
+
+if(EMOJI_PALETTE_BUILD_FCITX_ADDON)
+    add_subdirectory(src/addon)
+endif()
 
 if(BUILD_TESTING)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)

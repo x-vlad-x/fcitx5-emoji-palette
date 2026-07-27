@@ -1,0 +1,13 @@
+[Addon]
+Name=Emoji Palette
+Comment=Search and insert emoji
+Type=SharedLibrary
+Library=libemoji-palette
+Category=Module
+Version=@PROJECT_VERSION@
+OnDemand=False
+Configurable=True
+
+[Addon/Dependencies]
+0=core:5.1.0
+1=dbus:5.1.0
