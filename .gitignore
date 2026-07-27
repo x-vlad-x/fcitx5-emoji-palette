@@ -5,6 +5,8 @@
 /.clangd/
 /.idea/
 /.vscode/
+__pycache__/
+*.pyc
 *.rpm
 *.src.rpm
 *.tar.gz
