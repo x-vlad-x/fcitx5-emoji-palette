@@ -20,7 +20,10 @@ jobs:
       image: registry.fedoraproject.org/fedora@sha256:a0cddd3b24c82a88ab33d16bac3415e8b66d78a9e2901a16a1d6ba3865bec97e
     steps:
       - name: Install build dependencies
-        run: dnf install -y cmake ninja-build gcc-c++ python3 git libasan libubsan fcitx5-devel
+        run: >
+          dnf install -y cmake ninja-build gcc-c++ python3 git libasan libubsan
+          fcitx5-devel qt6-qtbase-devel qt6-linguist qt6-qttools-devel
+          layer-shell-qt-devel
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Configure
         run: >

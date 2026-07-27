@@ -22,11 +22,11 @@ target_compile_options(
 )
 set_target_properties(emoji-palette-addon PROPERTIES OUTPUT_NAME emoji-palette)
 
-configure_file(emoji-palette.conf.in emoji-palette.conf @ONLY)
+configure_file(emojipalette.conf.in emojipalette.conf @ONLY)
 
 install(TARGETS emoji-palette-addon DESTINATION "${FCITX_INSTALL_ADDONDIR}")
 install(
-    FILES "${CMAKE_CURRENT_BINARY_DIR}/emoji-palette.conf"
+    FILES "${CMAKE_CURRENT_BINARY_DIR}/emojipalette.conf"
     DESTINATION "${FCITX_INSTALL_PKGDATADIR}/addon"
     COMPONENT config
 )

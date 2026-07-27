@@ -23,7 +23,8 @@ path = [
   "protocol/**",
   "src/**",
   "tests/**",
-  "tools/**"
+  "tools/**",
+  "translations/**"
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Vladislav Shadiuk"
