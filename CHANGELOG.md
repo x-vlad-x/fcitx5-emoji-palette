@@ -4,6 +4,9 @@ All notable user-visible changes are documented here.
 
 ## Unreleased
 
+- Made configured activation shortcuts follow the physical key across keyboard
+  layout changes.
+
 ## 0.1.0-rc.2 - 2026-07-27
 
 - Published release assets with filenames that remain stable on GitHub.

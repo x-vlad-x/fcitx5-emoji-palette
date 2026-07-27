@@ -43,6 +43,23 @@ target_compile_options(
 )
 add_test(NAME selection-controller-tests COMMAND selection-controller-tests)
 
+if(TARGET EmojiPalette::Shortcut)
+    add_executable(shortcut-matcher-tests shortcut_matcher_tests.cpp)
+    target_link_libraries(shortcut-matcher-tests PRIVATE EmojiPalette::Shortcut)
+    target_compile_features(shortcut-matcher-tests PRIVATE cxx_std_20)
+    target_compile_options(
+        shortcut-matcher-tests
+        PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Wconversion
+            -Wsign-conversion
+            $<$<BOOL:${EMOJI_PALETTE_WARNINGS_AS_ERRORS}>:-Werror>
+    )
+    add_test(NAME shortcut-matcher-tests COMMAND shortcut-matcher-tests)
+endif()
+
 add_executable(core-benchmark core_benchmark.cpp)
 target_link_libraries(core-benchmark PRIVATE EmojiPalette::Core)
 target_compile_features(core-benchmark PRIVATE cxx_std_20)

@@ -28,6 +28,7 @@ desktop manual test matrix has not been executed.
 ## Requirements
 
 - Fcitx 5.1 or newer
+- libxkbcommon 1.0 or newer
 - Qt 6.6 or newer
 - LayerShellQt 6.6 or newer
 - Noto Color Emoji
@@ -87,6 +88,8 @@ Additional controls:
 Pointer selection is supported without transferring keyboard focus to the
 palette. The trigger and close-after-selection behavior are configurable in
 the Fcitx 5 configuration tool under **Addons → Emoji Palette**.
+Configured trigger letters follow their physical key when the active keyboard
+layout changes, so a single `Super+Z` binding also works from a Russian layout.
 
 ## Privacy and security model
 
@@ -105,6 +108,7 @@ Fedora 44 development dependencies:
 
 ```bash
 sudo dnf install cmake ninja-build gcc-c++ python3 fcitx5-devel \
+  libxkbcommon-devel \
   qt6-qtbase-devel qt6-linguist qt6-qttools-devel layer-shell-qt-devel
 ```
 

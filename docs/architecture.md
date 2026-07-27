@@ -16,7 +16,8 @@ and keyboard state machine. They do not depend on Fcitx5 or Qt widgets.
 
 The `emojipalette` module:
 
-- recognizes the configured trigger key;
+- recognizes the configured trigger key by keysym or by a physical keycode
+  derived from the input-method group's default XKB layout;
 - starts one selection transaction for the triggering input context;
 - stores the source context as
   `fcitx::TrackableObjectReference<fcitx::InputContext>`;
@@ -57,8 +58,9 @@ replaced with safe defaults.
 
 ## Selection transaction
 
-1. A key event matching the configured shortcut creates a random 128-bit
-   transaction identifier and a tracked reference to the triggering context.
+1. A key event matching the configured shortcut's keysym or derived physical
+   keycode creates a random 128-bit transaction identifier and a tracked
+   reference to the triggering context.
 2. The addon captures the caret rectangle and sends `Show` to the helper.
 3. While active, relevant keys are filtered before the input method and sent as
    bounded commands. Search text is never logged.

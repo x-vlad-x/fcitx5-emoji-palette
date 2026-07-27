@@ -15,7 +15,7 @@ Fedora 44 provides the reference toolchain:
 
 ```bash
 sudo dnf install cmake ninja-build gcc-c++ clang clang-tools-extra python3 \
-  fcitx5-devel qt6-qtbase-devel qt6-linguist qt6-qttools-devel \
+  fcitx5-devel libxkbcommon-devel qt6-qtbase-devel qt6-linguist qt6-qttools-devel \
   layer-shell-qt-devel reuse
 ```
 

@@ -15,6 +15,7 @@ BuildRequires:  desktop-file-utils
 BuildRequires:  fcitx5-devel >= 5.1
 BuildRequires:  gcc-c++
 BuildRequires:  libappstream-glib
+BuildRequires:  libxkbcommon-devel >= 1.0
 BuildRequires:  ninja-build
 BuildRequires:  python3
 BuildRequires:  qt6-linguist

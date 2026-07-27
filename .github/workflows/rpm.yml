@@ -23,7 +23,7 @@ jobs:
         run: >
           dnf install -y cmake dbus-daemon dbus-tools desktop-file-utils
           fcitx5-devel gcc-c++ git google-noto-color-emoji-fonts libappstream-glib
-          layer-shell-qt-devel ninja-build procps-ng python3 qt6-linguist
+          libxkbcommon-devel layer-shell-qt-devel ninja-build procps-ng python3 qt6-linguist
           qt6-qtbase-devel qt6-qttools-devel reuse rpm-build rpmlint
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:

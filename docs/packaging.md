@@ -90,7 +90,8 @@ Install the packaging dependencies in Fedora 44:
 
 ```bash
 sudo dnf install cmake desktop-file-utils fcitx5-devel gcc-c++ git \
-  google-noto-color-emoji-fonts libappstream-glib layer-shell-qt-devel \
+  google-noto-color-emoji-fonts libappstream-glib libxkbcommon-devel \
+  layer-shell-qt-devel \
   ninja-build python3 qt6-linguist qt6-qtbase-devel qt6-qttools-devel \
   reuse rpm-build rpmlint
 ```
