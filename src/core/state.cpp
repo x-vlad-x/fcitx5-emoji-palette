@@ -162,7 +162,7 @@ bool writeAll(int descriptor, std::string_view value) {
     return true;
 }
 
-} // namespace
+}
 
 StateStore::StateStore(std::filesystem::path path) : path_(std::move(path)) {}
 
@@ -256,4 +256,4 @@ void recordUse(PersistentState& state, std::string_view sequence, std::int64_t t
     }
 }
 
-} // namespace emoji_palette
+}

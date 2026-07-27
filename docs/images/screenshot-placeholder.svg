@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" rx="24" fill="#232629"/>
+  <rect x="140" y="80" width="680" height="380" rx="18" fill="#eff0f1"/>
+  <rect x="172" y="112" width="616" height="52" rx="10" fill="#ffffff" stroke="#bdc3c7"/>
+  <text x="198" y="146" font-family="sans-serif" font-size="20" fill="#6c7073">Search emoji</text>
+  <g font-family="sans-serif" font-size="43" text-anchor="middle">
+    <text x="216" y="235">😀</text>
+    <text x="322" y="235">🥳</text>
+    <text x="428" y="235">🚀</text>
+    <text x="534" y="235">❤️</text>
+    <text x="640" y="235">👍</text>
+    <text x="746" y="235">🌍</text>
+    <text x="216" y="316">🐧</text>
+    <text x="322" y="316">🍕</text>
+    <text x="428" y="316">🎮</text>
+    <text x="534" y="316">💡</text>
+    <text x="640" y="316">🛠️</text>
+    <text x="746" y="316">✨</text>
+  </g>
+  <rect x="172" y="357" width="616" height="65" rx="10" fill="#3daee9"/>
+  <text x="480" y="397" font-family="sans-serif" font-size="18" text-anchor="middle" fill="#ffffff">Screenshot will be replaced after target-desktop validation</text>
+</svg>

@@ -192,7 +192,7 @@ void testReconnectAndReplay() {
     require(!validator.accept(first, 4), "sequence accepted after reset");
 }
 
-} // namespace
+}
 
 int main() {
     try {

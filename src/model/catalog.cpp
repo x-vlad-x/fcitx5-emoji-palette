@@ -1,6 +1,7 @@
 #include "emoji_palette/catalog.hpp"
 
 #include "emoji_palette/utf8.hpp"
+#include "generated_catalog.hpp"
 
 #include <algorithm>
 #include <array>
@@ -11,21 +12,6 @@
 
 namespace emoji_palette {
 namespace {
-
-struct GeneratedEmoji {
-    std::string_view sequence;
-    Category category;
-    std::string_view subgroup;
-    std::string_view englishName;
-    std::string_view englishKeywords;
-    std::string_view germanName;
-    std::string_view germanKeywords;
-    std::string_view russianName;
-    std::string_view russianKeywords;
-    std::string_view baseSequence;
-};
-
-#include "data/generated/emoji_data.inc"
 
 std::vector<std::string> split(std::string_view value, char delimiter) {
     std::vector<std::string> result;
@@ -97,12 +83,13 @@ int documentScore(std::string_view token, const Document& document, std::size_t 
     return best;
 }
 
-} // namespace
+}
 
 EmojiCatalog::EmojiCatalog() {
-    records_.reserve(kGeneratedEmojiCount);
-    searchDocuments_.reserve(kGeneratedEmojiCount);
-    for (const auto& generated : kGeneratedEmoji) {
+    const auto generatedEmojis = detail::generatedEmojis();
+    records_.reserve(generatedEmojis.size());
+    searchDocuments_.reserve(generatedEmojis.size());
+    for (const auto& generated : generatedEmojis) {
         EmojiRecord record{
             .sequence = std::string(generated.sequence),
             .category = generated.category,
@@ -246,4 +233,4 @@ std::array<Category, 9> unicodeCategories() {
     };
 }
 
-} // namespace emoji_palette
+}

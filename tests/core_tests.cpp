@@ -149,7 +149,7 @@ void testGeometry() {
             "oversized popup clamp failed");
 }
 
-} // namespace
+}
 
 int main() {
     try {

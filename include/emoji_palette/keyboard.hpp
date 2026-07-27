@@ -45,4 +45,4 @@ class KeyboardState {
     std::size_t categoryCount_ = 1;
 };
 
-} // namespace emoji_palette
+}

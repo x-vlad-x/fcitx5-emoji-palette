@@ -16,4 +16,4 @@ std::string normalizeForSearch(std::string_view value);
 std::string hexEncode(std::string_view value);
 std::optional<std::string> hexDecode(std::string_view value);
 
-} // namespace emoji_palette
+}

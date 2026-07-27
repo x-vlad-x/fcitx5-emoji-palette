@@ -71,4 +71,4 @@ class EmojiCatalog {
 std::string_view categoryName(Category category);
 std::array<Category, 9> unicodeCategories();
 
-} // namespace emoji_palette
+}

@@ -16,13 +16,30 @@ option(EMOJI_PALETTE_BUILD_UI "Build the Qt 6 palette helper" ON)
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+configure_file(
+    data/org.fcitx.Fcitx5.EmojiPalette.desktop.in
+    org.fcitx.Fcitx5.EmojiPalette.desktop
+    @ONLY
+)
+
+install(
+    FILES "${CMAKE_CURRENT_BINARY_DIR}/org.fcitx.Fcitx5.EmojiPalette.desktop"
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/applications"
+)
+install(
+    FILES data/org.fcitx.Fcitx5.EmojiPalette.metainfo.xml
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/metainfo"
+)
+
 add_library(
     emoji-palette-core
+    STATIC
     src/core/geometry.cpp
     src/core/keyboard.cpp
     src/core/state.cpp
     src/core/utf8.cpp
     src/model/catalog.cpp
+    src/model/generated_catalog.cpp
 )
 add_library(EmojiPalette::Core ALIAS emoji-palette-core)
 
@@ -46,9 +63,14 @@ target_compile_options(
         $<$<AND:$<CONFIG:Release>,$<CXX_COMPILER_ID:GNU>>:-O2>
         $<$<BOOL:${EMOJI_PALETTE_WARNINGS_AS_ERRORS}>:-Werror>
 )
+set_source_files_properties(
+    src/model/generated_catalog.cpp
+    PROPERTIES COMPILE_OPTIONS "$<$<CXX_COMPILER_ID:GNU,Clang>:-fno-lto;-g0>"
+)
 
 add_library(
     emoji-palette-ipc
+    STATIC
     src/ipc/protocol.cpp
     src/ipc/session.cpp
 )
@@ -74,6 +96,7 @@ target_compile_options(
 
 add_library(
     emoji-palette-runtime
+    STATIC
     src/runtime/selection_controller.cpp
 )
 add_library(EmojiPalette::Runtime ALIAS emoji-palette-runtime)

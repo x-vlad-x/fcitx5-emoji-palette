@@ -51,7 +51,7 @@ int hexValue(char value) {
     return -1;
 }
 
-} // namespace
+}
 
 std::optional<std::vector<std::uint32_t>> decodeUtf8(std::string_view value) {
     std::vector<std::uint32_t> result;
@@ -187,4 +187,4 @@ std::optional<std::string> hexDecode(std::string_view value) {
     return result;
 }
 
-} // namespace emoji_palette
+}

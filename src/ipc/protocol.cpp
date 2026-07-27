@@ -315,7 +315,7 @@ std::optional<Payload> readPayload(MessageType type, Reader& reader, ProtocolErr
     return std::nullopt;
 }
 
-} // namespace
+}
 
 std::optional<TransactionId> transactionIdFromString(std::string_view value) {
     if (value.size() != 32) {
@@ -425,4 +425,4 @@ std::optional<Welcome> negotiate(const Hello& hello, std::uint32_t supportedCapa
     };
 }
 
-} // namespace emoji_palette::ipc
+}

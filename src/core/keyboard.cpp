@@ -86,4 +86,4 @@ std::size_t KeyboardState::selectedIndex() const { return selectedIndex_; }
 
 std::size_t KeyboardState::categoryIndex() const { return categoryIndex_; }
 
-} // namespace emoji_palette
+}

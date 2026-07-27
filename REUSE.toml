@@ -10,6 +10,7 @@ path = [
   "CMakeLists.txt",
   "CMakePresets.json",
   "LICENSE",
+  "LICENSES/**",
   "README.md",
   "CHANGELOG.md",
   "CODE_OF_CONDUCT.md",
@@ -18,8 +19,9 @@ path = [
   "SUPPORT.md",
   "THIRD_PARTY_NOTICES.md",
   "data/unicode-versions.json",
-  "docs/**",
+  "docs/**/*.md",
   "include/**",
+  "packaging/**",
   "protocol/**",
   "src/**",
   "tests/**",
@@ -29,6 +31,16 @@ path = [
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Vladislav Shadiuk"
 SPDX-License-Identifier = "GPL-3.0-or-later"
+
+[[annotations]]
+path = [
+  "data/org.fcitx.Fcitx5.EmojiPalette.desktop.in",
+  "data/org.fcitx.Fcitx5.EmojiPalette.metainfo.xml",
+  "docs/images/**"
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Vladislav Shadiuk"
+SPDX-License-Identifier = "CC0-1.0"
 
 [[annotations]]
 path = "data/generated/**"

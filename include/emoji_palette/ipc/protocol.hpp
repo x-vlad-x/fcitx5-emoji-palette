@@ -166,4 +166,4 @@ std::optional<std::vector<std::uint8_t>> serialize(const Envelope& envelope);
 ParseResult parse(std::span<const std::uint8_t> frame);
 std::optional<Welcome> negotiate(const Hello& hello, std::uint32_t supportedCapabilities);
 
-} // namespace emoji_palette::ipc
+}

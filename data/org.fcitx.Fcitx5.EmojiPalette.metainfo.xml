@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="addon">
+  <id>org.fcitx.Fcitx5.EmojiPalette</id>
+  <extends>org.fcitx.Fcitx5</extends>
+  <name>Emoji Palette for Fcitx 5</name>
+  <summary>Search and insert emoji through Fcitx 5</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <description>
+    <p>
+      Emoji Palette provides a searchable, keyboard-driven emoji picker for
+      Fcitx 5. It commits selections through the original Fcitx input context
+      without modifying the clipboard or simulating input.
+    </p>
+    <p>
+      The non-activating palette supports English, German, and Russian search,
+      favorites, recent emoji, skin-tone variants, and multi-monitor Wayland
+      placement.
+    </p>
+  </description>
+  <url type="homepage">https://github.com/x-vlad-x/fcitx5-emoji-palette</url>
+  <url type="bugtracker">https://github.com/x-vlad-x/fcitx5-emoji-palette/issues</url>
+  <provides>
+    <binary>fcitx5-emoji-palette-ui</binary>
+  </provides>
+  <releases>
+    <release version="0.1.0-rc.1" date="2026-07-27">
+      <description>
+        <p>First public prerelease for Fedora 44 and Bazzite 44.</p>
+      </description>
+    </release>
+  </releases>
+</component>
