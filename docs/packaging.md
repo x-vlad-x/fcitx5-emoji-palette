@@ -9,7 +9,7 @@ and spec file.
 Install a downloaded release artifact:
 
 ```bash
-sudo dnf install ./fcitx5-emoji-palette-0.1.0~rc1-1.fc44.x86_64.rpm
+sudo dnf install ./fcitx5-emoji-palette-0.1.0-rc.2-1.fc44.x86_64.rpm
 fcitx5 -r
 ```
 
@@ -33,7 +33,7 @@ process. Package layering is therefore the direct installation path.
 Download the RPM matching the Fedora base and machine architecture, then:
 
 ```bash
-sudo rpm-ostree install ./fcitx5-emoji-palette-0.1.0~rc1-1.fc44.x86_64.rpm
+sudo rpm-ostree install ./fcitx5-emoji-palette-0.1.0-rc.2-1.fc44.x86_64.rpm
 systemctl reboot
 ```
 
@@ -98,7 +98,7 @@ sudo dnf install cmake desktop-file-utils fcitx5-devel gcc-c++ git \
 From a clean checkout:
 
 ```bash
-version=0.1.0-rc.1
+version=0.1.0-rc.2
 mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 git archive \
   --format=tar.gz \

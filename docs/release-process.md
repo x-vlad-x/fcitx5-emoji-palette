@@ -32,8 +32,12 @@ ephemeral Fedora environment until a host test is explicitly authorized.
 2. Create a signed annotated `vVERSION` tag on the merge commit.
 3. Create a GitHub prerelease or release from that tag.
 4. Attach the binary RPM and SRPM produced from the tagged source.
-5. Publish checksums and concise release notes with known limitations.
-6. Verify that the public artifacts install in a fresh Fedora 44 environment.
+5. Use release-asset filenames that do not contain `~`, which GitHub
+   normalizes during upload.
+6. Publish checksums and concise release notes with known limitations.
+7. Download the public assets and verify the checksum manifest against their
+   final server-side names.
+8. Verify that the public artifacts install in a fresh Fedora 44 environment.
 
 ## After publication
 

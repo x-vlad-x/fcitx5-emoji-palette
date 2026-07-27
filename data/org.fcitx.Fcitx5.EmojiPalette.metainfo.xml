@@ -24,6 +24,11 @@
     <binary>fcitx5-emoji-palette-ui</binary>
   </provides>
   <releases>
+    <release version="0.1.0-rc.2" date="2026-07-27">
+      <description>
+        <p>Corrected prerelease publication for Fedora 44 and Bazzite 44.</p>
+      </description>
+    </release>
     <release version="0.1.0-rc.1" date="2026-07-27">
       <description>
         <p>First public prerelease for Fedora 44 and Bazzite 44.</p>

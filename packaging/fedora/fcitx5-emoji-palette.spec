@@ -1,8 +1,8 @@
 %global upstream_version 0.1.0
-%global prerelease_version rc.1
+%global prerelease_version rc.2
 
 Name:           fcitx5-emoji-palette
-Version:        0.1.0~rc1
+Version:        0.1.0~rc2
 Release:        1%{?dist}
 Summary:        Native emoji picker for Fcitx 5
 
@@ -66,5 +66,8 @@ appstream-util validate-relax --nonet \
 %{_metainfodir}/org.fcitx.Fcitx5.EmojiPalette.metainfo.xml
 
 %changelog
+* Mon Jul 27 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-1
+- Publish release-asset-safe filenames
+
 * Mon Jul 27 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc1-1
 - Initial prerelease

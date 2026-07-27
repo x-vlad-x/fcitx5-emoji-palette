@@ -35,8 +35,8 @@ jobs:
           mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
           git archive \
             --format=tar.gz \
-            --prefix=fcitx5-emoji-palette-0.1.0-rc.1/ \
-            --output=rpmbuild/SOURCES/v0.1.0-rc.1.tar.gz \
+            --prefix=fcitx5-emoji-palette-0.1.0-rc.2/ \
+            --output=rpmbuild/SOURCES/v0.1.0-rc.2.tar.gz \
             HEAD
           cp packaging/fedora/fcitx5-emoji-palette.spec rpmbuild/SPECS/
       - name: Build RPM and SRPM
@@ -53,7 +53,7 @@ jobs:
       - name: Test packaged installation
         run: |
           dnf install -y \
-            rpmbuild/RPMS/*/fcitx5-emoji-palette-0.1.0~rc1-1.fc44.*.rpm
+            rpmbuild/RPMS/*/fcitx5-emoji-palette-0.1.0~rc2-1.fc44.*.rpm
           test -x /usr/libexec/fcitx5-emoji-palette-ui
           test -f /usr/share/fcitx5/addon/emojipalette.conf
           test -f /usr/share/dbus-1/services/org.fcitx.Fcitx5.EmojiPalette1.service

@@ -1,9 +1,9 @@
 FROM ghcr.io/ublue-os/bazzite:stable
 
-COPY fcitx5-emoji-palette-0.1.0~rc1-1.fc44.x86_64.rpm /tmp/
+COPY fcitx5-emoji-palette-0.1.0-rc.2-1.fc44.x86_64.rpm /tmp/
 
-RUN dnf5 install -y /tmp/fcitx5-emoji-palette-0.1.0~rc1-1.fc44.x86_64.rpm && \
-    rm /tmp/fcitx5-emoji-palette-0.1.0~rc1-1.fc44.x86_64.rpm && \
+RUN dnf5 install -y /tmp/fcitx5-emoji-palette-0.1.0-rc.2-1.fc44.x86_64.rpm && \
+    rm /tmp/fcitx5-emoji-palette-0.1.0-rc.2-1.fc44.x86_64.rpm && \
     dnf5 clean all
 
 RUN bootc container lint

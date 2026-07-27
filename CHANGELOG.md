@@ -4,6 +4,11 @@ All notable user-visible changes are documented here.
 
 ## Unreleased
 
+## 0.1.0-rc.2 - 2026-07-27
+
+- Published release assets with filenames that remain stable on GitHub.
+- Added public-asset checksum verification to the release process.
+
 ## 0.1.0-rc.1 - 2026-07-27
 
 - Added direct insertion through the original Fcitx 5 input context.
