@@ -1,0 +1,210 @@
+#!/usr/bin/python3
+
+import argparse
+import hashlib
+import json
+import re
+import shutil
+import tempfile
+import urllib.request
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+
+CATEGORIES = {
+    "Smileys & Emotion": "SmileysEmotion",
+    "People & Body": "PeopleBody",
+    "Animals & Nature": "AnimalsNature",
+    "Food & Drink": "FoodDrink",
+    "Travel & Places": "TravelPlaces",
+    "Activities": "Activities",
+    "Objects": "Objects",
+    "Symbols": "Symbols",
+    "Flags": "Flags",
+}
+
+TONES = {chr(value) for value in range(0x1F3FB, 0x1F400)}
+
+
+def sha256(path):
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def obtain_sources(manifest, source_dir):
+    if source_dir:
+        root = Path(source_dir)
+        for source in manifest["sources"]:
+            path = root / source["name"]
+            if not path.is_file():
+                raise RuntimeError(f"missing source: {path}")
+            if sha256(path) != source["sha256"]:
+                raise RuntimeError(f"checksum mismatch: {source['name']}")
+        return root, None
+
+    temporary = tempfile.TemporaryDirectory(prefix="emoji-palette-unicode-")
+    root = Path(temporary.name)
+    for source in manifest["sources"]:
+        target = root / source["name"]
+        with urllib.request.urlopen(source["url"], timeout=30) as response:
+            with target.open("wb") as output:
+                shutil.copyfileobj(response, output)
+        if sha256(target) != source["sha256"]:
+            raise RuntimeError(f"checksum mismatch: {source['name']}")
+    return root, temporary
+
+
+def without_variation_selectors(value):
+    return value.replace("\ufe0f", "")
+
+
+def parse_annotations(root, locale):
+    result = {}
+    for suffix in ("", "-derived"):
+        tree = ET.parse(root / f"{locale}{suffix}.xml")
+        for element in tree.findall(".//annotation"):
+            emoji = without_variation_selectors(element.attrib["cp"])
+            entry = result.setdefault(emoji, {"name": "", "keywords": []})
+            text = element.text or ""
+            if element.attrib.get("type") == "tts":
+                entry["name"] = text
+            else:
+                entry["keywords"].extend(
+                    item.strip() for item in text.split("|") if item.strip()
+                )
+    for entry in result.values():
+        entry["keywords"] = sorted(
+            set(entry["keywords"]), key=lambda value: (value.casefold(), value)
+        )
+    return result
+
+
+def parse_emoji_test(path):
+    records = []
+    category = None
+    subgroup = None
+    seen = set()
+    line_pattern = re.compile(
+        r"^([0-9A-F ]+)\s*;\s*fully-qualified\s*#\s*\S+\s+E[0-9.]+\s+(.+)$"
+    )
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        if raw_line.startswith("# group:"):
+            category = raw_line.partition(":")[2].strip()
+            continue
+        if raw_line.startswith("# subgroup:"):
+            subgroup = raw_line.partition(":")[2].strip()
+            continue
+        match = line_pattern.match(raw_line)
+        if not match or category not in CATEGORIES:
+            continue
+        codepoints = [int(value, 16) for value in match.group(1).split()]
+        emoji = "".join(chr(value) for value in codepoints)
+        if emoji in seen:
+            raise RuntimeError(f"duplicate fully-qualified emoji: {emoji}")
+        seen.add(emoji)
+        records.append(
+            {
+                "emoji": emoji,
+                "category": CATEGORIES[category],
+                "subgroup": subgroup or "",
+                "unicode_name": match.group(2).strip(),
+                "codepoints": codepoints,
+            }
+        )
+    if not records:
+        raise RuntimeError("emoji-test.txt produced no records")
+    return records
+
+
+def annotation_for(annotations, emoji):
+    return annotations.get(without_variation_selectors(emoji), {})
+
+
+def remove_tones(emoji):
+    return "".join(character for character in emoji if character not in TONES)
+
+
+def cpp_string(value):
+    return json.dumps(value, ensure_ascii=False)
+
+
+def generate(records, annotations, output):
+    emoji_set = {record["emoji"] for record in records}
+    lines = [
+        "static const GeneratedEmoji kGeneratedEmoji[] = {",
+    ]
+    for record in records:
+        localized = []
+        for locale in ("en", "de", "ru"):
+            annotation = annotation_for(annotations[locale], record["emoji"])
+            name = annotation.get("name") or (
+                record["unicode_name"] if locale == "en" else ""
+            )
+            keywords = "|".join(annotation.get("keywords", []))
+            localized.extend((name, keywords))
+        base = remove_tones(record["emoji"])
+        if base == record["emoji"] or base not in emoji_set:
+            base = ""
+        fields = [
+            cpp_string(record["emoji"]),
+            f"Category::{record['category']}",
+            cpp_string(record["subgroup"]),
+            *(cpp_string(value) for value in localized),
+            cpp_string(base),
+        ]
+        lines.append("    {" + ", ".join(fields) + "},")
+    lines.extend(
+        [
+            "};",
+            "",
+            f"static constexpr std::size_t kGeneratedEmojiCount = {len(records)};",
+            "",
+        ]
+    )
+    content = "\n".join(lines)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output.with_suffix(output.suffix + ".tmp")
+    temporary.write_text(content, encoding="utf-8", newline="\n")
+    temporary.replace(output)
+
+
+def main():
+    repository = Path(__file__).resolve().parent.parent
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--emoji-version")
+    parser.add_argument("--cldr-version")
+    parser.add_argument("--source-dir")
+    parser.add_argument(
+        "--manifest",
+        type=Path,
+        default=repository / "data" / "unicode-versions.json",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=repository / "data" / "generated" / "emoji_data.inc",
+    )
+    arguments = parser.parse_args()
+    manifest = json.loads(arguments.manifest.read_text(encoding="utf-8"))
+    if arguments.emoji_version and arguments.emoji_version != manifest["emoji_version"]:
+        raise RuntimeError("emoji version is not present in the checksum manifest")
+    if arguments.cldr_version and arguments.cldr_version != manifest["cldr_version"]:
+        raise RuntimeError("CLDR version is not present in the checksum manifest")
+    source_root, temporary = obtain_sources(manifest, arguments.source_dir)
+    try:
+        annotations = {
+            locale: parse_annotations(source_root, locale)
+            for locale in ("en", "de", "ru")
+        }
+        records = parse_emoji_test(source_root / "emoji-test.txt")
+        generate(records, annotations, arguments.output)
+    finally:
+        if temporary:
+            temporary.cleanup()
+
+
+if __name__ == "__main__":
+    main()
