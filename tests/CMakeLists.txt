@@ -28,6 +28,21 @@ target_compile_options(
 )
 add_test(NAME ipc-tests COMMAND ipc-tests)
 
+add_executable(selection-controller-tests selection_controller_tests.cpp)
+target_link_libraries(selection-controller-tests PRIVATE EmojiPalette::Runtime)
+target_compile_features(selection-controller-tests PRIVATE cxx_std_20)
+target_compile_options(
+    selection-controller-tests
+    PRIVATE
+        -Wall
+        -Wextra
+        -Wpedantic
+        -Wconversion
+        -Wsign-conversion
+        $<$<BOOL:${EMOJI_PALETTE_WARNINGS_AS_ERRORS}>:-Werror>
+)
+add_test(NAME selection-controller-tests COMMAND selection-controller-tests)
+
 add_executable(core-benchmark core_benchmark.cpp)
 target_link_libraries(core-benchmark PRIVATE EmojiPalette::Core)
 target_compile_features(core-benchmark PRIVATE cxx_std_20)
