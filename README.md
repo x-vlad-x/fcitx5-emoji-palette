@@ -43,7 +43,7 @@ Download the binary RPM for your architecture from the
 then install it:
 
 ```bash
-sudo dnf install ./fcitx5-emoji-palette-0.1.0~rc1-1.fc44.x86_64.rpm
+sudo dnf install ./fcitx5-emoji-palette-0.1.0-rc.2-1.fc44.x86_64.rpm
 fcitx5 -r
 ```
 
@@ -56,7 +56,7 @@ This addon must run inside the host Fcitx process, so a Flatpak or Distrobox
 package cannot provide the required integration. Layer the downloaded RPM:
 
 ```bash
-sudo rpm-ostree install ./fcitx5-emoji-palette-0.1.0~rc1-1.fc44.x86_64.rpm
+sudo rpm-ostree install ./fcitx5-emoji-palette-0.1.0-rc.2-1.fc44.x86_64.rpm
 systemctl reboot
 ```
 
