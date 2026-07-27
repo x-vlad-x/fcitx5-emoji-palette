@@ -1,0 +1,30 @@
+name: Bug report
+description: Report a reproducible defect
+title: "bug: "
+labels:
+  - type/bug
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Distribution, desktop, Wayland or X11, Fcitx5, and package versions
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Remove private text, search queries, and unrelated journal content
