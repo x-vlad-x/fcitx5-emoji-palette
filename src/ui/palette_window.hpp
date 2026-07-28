@@ -40,8 +40,12 @@ class PaletteWindow final : public QWidget {
     void selectionRequested(QString sequence);
     void cancellationRequested(ipc::CancelReason reason);
 
+  protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
+
   private:
     void buildUi();
+    void setSettingsPanelVisible(bool visible);
     void setCategory(std::size_t index);
     void updateSearch(const QString& query);
     void refreshGrid(bool resetSelection);
@@ -70,6 +74,8 @@ class PaletteWindow final : public QWidget {
     QLabel* statusLabel_ = nullptr;
     QButtonGroup* categoryGroup_ = nullptr;
     QFrame* variantsPanel_ = nullptr;
+    QFrame* settingsPanel_ = nullptr;
+    QToolButton* settingsButton_ = nullptr;
     QToolButton* favoriteButton_ = nullptr;
     QToolButton* variantsButton_ = nullptr;
     int cellSize_ = 52;

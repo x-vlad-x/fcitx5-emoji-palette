@@ -8,6 +8,7 @@
     <message><source>Search query</source><translation>Suchanfrage</translation></message>
     <message><source>Search: %1</source><translation>Suche: %1</translation></message>
     <message><source>Grid settings</source><translation>Rastereinstellungen</translation></message>
+    <message><source>Grid size:</source><translation>Rastergröße:</translation></message>
     <message><source>Emoji grid</source><translation>Emoji-Raster</translation></message>
     <message><source>Selected emoji</source><translation>Ausgewähltes Emoji</translation></message>
     <message><source>Toggle favorite</source><translation>Favorit umschalten</translation></message>

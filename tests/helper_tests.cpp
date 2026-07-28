@@ -7,9 +7,11 @@
 #include "emoji_palette/state.hpp"
 
 #include <QByteArray>
+#include <QListView>
 #include <QSettings>
 #include <QSignalSpy>
 #include <QTemporaryDir>
+#include <QToolButton>
 #include <QtTest>
 
 #include <cstdint>
@@ -39,6 +41,16 @@ emoji_palette::ipc::TransactionId transaction(std::uint8_t marker) {
     return value;
 }
 
+QToolButton* settingsButton(emoji_palette::ui::PaletteWindow& window) {
+    const auto buttons = window.findChildren<QToolButton*>();
+    for (auto* button : buttons) {
+        if (button->accessibleName() == QStringLiteral("Grid settings")) {
+            return button;
+        }
+    }
+    return nullptr;
+}
+
 }
 
 class HelperTests final : public QObject {
@@ -47,6 +59,8 @@ class HelperTests final : public QObject {
   private slots:
     void localizedModelSearch();
     void configurationMigration();
+    void settingsPanelStateTransitions();
+    void settingsPanelPreservesSession();
     void sessionSelectsOnce();
     void sessionRejectsWrongOwnerAndReplay();
 };
@@ -82,6 +96,124 @@ void HelperTests::configurationMigration() {
     QCOMPARE(migrated.value(QStringLiteral("SchemaVersion")).toInt(), 1);
     QCOMPARE(migrated.value(QStringLiteral("Ui/CellSize")).toInt(), 64);
     QVERIFY(!migrated.contains(QStringLiteral("cellSize")));
+}
+
+void HelperTests::settingsPanelStateTransitions() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    const auto settingsPath = temporary.filePath(QStringLiteral("settings.ini"));
+    emoji_palette::EmojiCatalog catalog;
+    emoji_palette::ui::PaletteWindow window(
+        catalog, std::filesystem::path(temporary.path().toStdString()) / "state", settingsPath);
+    QSignalSpy selected(&window, &emoji_palette::ui::PaletteWindow::selectionRequested);
+    QSignalSpy cancelled(&window, &emoji_palette::ui::PaletteWindow::cancellationRequested);
+    window.showPalette({transaction(3),
+                        {100, 100, 2, 20},
+                        {0, 0, 1920, 1080},
+                        emoji_palette::Locale::English,
+                        100,
+                        true});
+
+    auto* button = settingsButton(window);
+    QVERIFY(button != nullptr);
+    QVERIFY2(button->menu() == nullptr,
+             "the settings control must not create a top-level popup window");
+    auto* panel = window.findChild<QWidget*>(QStringLiteral("settingsPanel"));
+    QVERIFY(panel != nullptr);
+    QVERIFY(!panel->isVisible());
+
+    for (int cycle = 0; cycle < 20; ++cycle) {
+        QTest::mouseClick(button, Qt::LeftButton);
+        QVERIFY(panel->isVisible());
+        QVERIFY(window.isVisible());
+        window.handleCommand({transaction(3),
+                              static_cast<std::uint32_t>(cycle + 1),
+                              emoji_palette::ipc::CommandKind::Cancel,
+                              {}});
+        QVERIFY(!panel->isVisible());
+        QVERIFY(window.isVisible());
+        QCOMPARE(selected.count(), 0);
+        QCOMPARE(cancelled.count(), 0);
+    }
+
+    QTest::mouseClick(button, Qt::LeftButton);
+    auto* largeButton = window.findChild<QToolButton*>(QStringLiteral("settingsSizeLarge"));
+    QVERIFY(largeButton != nullptr);
+    QTest::mouseClick(largeButton, Qt::LeftButton);
+    QVERIFY(panel->isVisible());
+    const auto screenshotPath = qEnvironmentVariable("EMOJI_PALETTE_SETTINGS_TEST_SCREENSHOT");
+    if (!screenshotPath.isEmpty()) {
+        QVERIFY(window.grab().save(screenshotPath));
+    }
+    QCOMPARE(
+        QSettings(settingsPath, QSettings::IniFormat).value(QStringLiteral("Ui/CellSize")).toInt(),
+        64);
+    QCOMPARE(selected.count(), 0);
+    QCOMPARE(cancelled.count(), 0);
+
+    auto* grid = window.findChild<QListView*>();
+    QVERIFY(grid != nullptr);
+    QVERIFY(grid->currentIndex().isValid());
+    QTest::mouseClick(grid->viewport(), Qt::LeftButton, Qt::NoModifier,
+                      grid->visualRect(grid->currentIndex()).center());
+    QVERIFY(!panel->isVisible());
+    QVERIFY(window.isVisible());
+    QCOMPARE(selected.count(), 0);
+    QCOMPARE(cancelled.count(), 0);
+
+    window.handleCommand({transaction(3), 22, emoji_palette::ipc::CommandKind::Cancel, {}});
+    QCOMPARE(cancelled.count(), 1);
+}
+
+void HelperTests::settingsPanelPreservesSession() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    emoji_palette::EmojiCatalog catalog;
+    emoji_palette::ui::PaletteWindow window(
+        catalog, std::filesystem::path(temporary.path().toStdString()) / "state",
+        temporary.filePath(QStringLiteral("settings.ini")));
+    emoji_palette::ui::PaletteSession session(window);
+    QSignalSpy outgoing(&session, &emoji_palette::ui::PaletteSession::outgoingFrame);
+    const QString sender = QStringLiteral(":1.41");
+    session.exchange(frame(emoji_palette::ipc::Hello{1, 1, 13, 0}), sender);
+
+    const auto id = transaction(4);
+    QVERIFY(!session
+                 .exchange(frame(emoji_palette::ipc::Show{id,
+                                                          {100, 100, 2, 20},
+                                                          {0, 0, 1920, 1080},
+                                                          emoji_palette::Locale::English,
+                                                          100,
+                                                          true}),
+                           sender)
+                 .isEmpty());
+    auto* button = settingsButton(window);
+    QVERIFY(button != nullptr);
+    QVERIFY2(button->menu() == nullptr,
+             "the settings control must not create a top-level popup window");
+    QTest::mouseClick(button, Qt::LeftButton);
+
+    QVERIFY(!session
+                 .exchange(frame(emoji_palette::ipc::Command{
+                               id, 1, emoji_palette::ipc::CommandKind::Cancel, {}}),
+                           sender)
+                 .isEmpty());
+    QCOMPARE(outgoing.count(), 0);
+    QVERIFY(window.isVisible());
+    QVERIFY(!session
+                 .exchange(frame(emoji_palette::ipc::Command{
+                               id, 2, emoji_palette::ipc::CommandKind::Right, {}}),
+                           sender)
+                 .isEmpty());
+    QCOMPARE(outgoing.count(), 0);
+
+    QVERIFY(!session
+                 .exchange(frame(emoji_palette::ipc::Command{
+                               id, 3, emoji_palette::ipc::CommandKind::Cancel, {}}),
+                           sender)
+                 .isEmpty());
+    QCOMPARE(outgoing.count(), 1);
+    QVERIFY(!window.isVisible());
 }
 
 void HelperTests::sessionSelectsOnce() {

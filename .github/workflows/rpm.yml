@@ -54,7 +54,7 @@ jobs:
         run: |
           package_path=$(
             printf '%s\n' \
-              rpmbuild/RPMS/*/fcitx5-emoji-palette-0.1.0~rc2-2.fc44.*.rpm
+              rpmbuild/RPMS/*/fcitx5-emoji-palette-0.1.0~rc2-3.fc44.*.rpm
           )
           rpm -qp --requires "$package_path" | grep -Fq 'libxkbcommon.so.0()(64bit)'
           dnf install -y "$package_path"

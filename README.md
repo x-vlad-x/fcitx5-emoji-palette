@@ -91,6 +91,12 @@ the Fcitx 5 configuration tool under **Addons → Emoji Palette**.
 Configured trigger letters follow their physical key when the active keyboard
 layout changes, so a single `Super+Z` binding also works from a Russian layout.
 
+The grid-settings button expands controls inside the picker without creating a
+focusable popup. The first `Escape` press or pointer press elsewhere inside the
+picker closes only those controls. Clicking another application follows the
+normal source-focus rule and cancels the picker if the original input context
+loses focus.
+
 ## Privacy and security model
 
 The helper can request only a Unicode string associated with the active

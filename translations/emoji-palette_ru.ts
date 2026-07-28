@@ -8,6 +8,7 @@
     <message><source>Search query</source><translation>Поисковый запрос</translation></message>
     <message><source>Search: %1</source><translation>Поиск: %1</translation></message>
     <message><source>Grid settings</source><translation>Настройки сетки</translation></message>
+    <message><source>Grid size:</source><translation>Размер сетки:</translation></message>
     <message><source>Emoji grid</source><translation>Сетка эмодзи</translation></message>
     <message><source>Selected emoji</source><translation>Выбранный эмодзи</translation></message>
     <message><source>Toggle favorite</source><translation>Добавить или убрать из избранного</translation></message>
