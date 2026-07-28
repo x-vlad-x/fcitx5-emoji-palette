@@ -17,7 +17,8 @@ and keyboard state machine. They do not depend on Fcitx5 or Qt widgets.
 The `emojipalette` module:
 
 - recognizes the configured trigger key by keysym or by a physical keycode
-  derived from the input-method group's default XKB layout;
+  derived from the input-method group's default XKB layout, with a US fallback
+  for Latin shortcut names absent from a non-Latin layout;
 - starts one selection transaction for the triggering input context;
 - stores the source context as
   `fcitx::TrackableObjectReference<fcitx::InputContext>`;
@@ -28,7 +29,12 @@ The `emojipalette` module:
   helper disconnect, or protocol error.
 
 The addon is single-threaded on the Fcitx event loop. It does not contain Qt UI
-code and never blocks while waiting for the helper.
+code and never blocks while waiting for the helper. Addon construction does not
+read the current input-method group because Fcitx loads shared-library addons
+before it initializes that group. `InputMethodGroupChanged` events apply the
+new layout only after group initialization. Trigger matching and filtering run
+before input-method dispatch so a physical fallback match cannot also commit
+the layout-translated character.
 
 ### Qt 6 helper
 

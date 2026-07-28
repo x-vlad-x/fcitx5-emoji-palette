@@ -5,7 +5,12 @@ All notable user-visible changes are documented here.
 ## Unreleased
 
 - Made configured activation shortcuts follow the physical key across keyboard
-  layout changes.
+  layout changes, including shifted letters, without leaking the translated
+  character to the focused application.
+- Prevented the addon from terminating Fcitx5 when it loads before
+  input-method groups are initialized.
+- Made local test RPM output commit-specific while retaining the reviewed
+  package release and clean RPM lint results.
 
 ## 0.1.0-rc.2 - 2026-07-27
 

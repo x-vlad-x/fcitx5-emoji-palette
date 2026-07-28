@@ -130,8 +130,7 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
   public:
     explicit EmojiPaletteAddon(fcitx::Instance* instance)
         : instance_(instance), dbus_(instance_->addonManager().addon("dbus")),
-          bus_(dbus_->call<fcitx::IDBusModule::bus>()), watcher_(*bus_), controller_(catalog_),
-          shortcutMatcher_(instance_->inputMethodManager().currentGroup().defaultLayout()) {
+          bus_(dbus_->call<fcitx::IDBusModule::bus>()), watcher_(*bus_), controller_(catalog_) {
         frameMatch_ =
             bus_->addMatch(fcitx::dbus::MatchRule(serviceName, objectPath, interfaceName, "Frame"),
                            [this](fcitx::dbus::Message& message) { return receiveFrame(message); });
@@ -148,9 +147,13 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
             });
 
         eventHandlers_.emplace_back(instance_->watchEvent(
-            fcitx::EventType::InputContextKeyEvent, fcitx::EventWatcherPhase::Default,
+            fcitx::EventType::InputContextKeyEvent, fcitx::EventWatcherPhase::PreInputMethod,
             [this](fcitx::Event& event) {
                 auto& keyEvent = static_cast<fcitx::KeyEvent&>(event);
+                if (controller_.active()) {
+                    handleActiveKey(keyEvent);
+                    return;
+                }
                 if (!keyEvent.isRelease() &&
                     shortcutMatcher_.matches(keyEvent.key(), keyEvent.origKey())) {
                     show(*keyEvent.inputContext());
@@ -159,7 +162,7 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
             }));
         eventHandlers_.emplace_back(instance_->watchEvent(
             fcitx::EventType::InputMethodGroupChanged, fcitx::EventWatcherPhase::Default,
-            [this](fcitx::Event&) { reloadShortcuts(); }));
+            [this](fcitx::Event&) { reloadLayout(); }));
 
         const auto reset = [this](CancelReason reason, fcitx::Event& event) {
             auto& contextEvent = static_cast<fcitx::InputContextEvent&>(event);
@@ -179,11 +182,6 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
         eventHandlers_.emplace_back(instance_->watchEvent(
             fcitx::EventType::InputContextDestroyed, fcitx::EventWatcherPhase::Default,
             [reset](fcitx::Event& event) { reset(CancelReason::ContextDestroyed, event); }));
-        eventHandlers_.emplace_back(instance_->watchEvent(
-            fcitx::EventType::InputContextKeyEvent, fcitx::EventWatcherPhase::PreInputMethod,
-            [this](fcitx::Event& event) {
-                handleActiveKey(static_cast<fcitx::KeyEvent&>(event));
-            }));
 
         reloadConfig();
     }
@@ -203,8 +201,16 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
 
   private:
     void reloadShortcuts() {
-        shortcutMatcher_.setLayout(instance_->inputMethodManager().currentGroup().defaultLayout());
         shortcutMatcher_.setShortcuts(*config_.triggerKey);
+        reloadLayout();
+    }
+
+    void reloadLayout() {
+        const auto& manager = instance_->inputMethodManager();
+        if (manager.groupCount() == 0) {
+            return;
+        }
+        shortcutMatcher_.setLayout(manager.currentGroup().defaultLayout());
     }
 
     void show(fcitx::InputContext& context) {
