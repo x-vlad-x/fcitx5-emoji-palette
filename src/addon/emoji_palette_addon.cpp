@@ -3,6 +3,7 @@
 #include "emoji_palette/ipc/session.hpp"
 #include "emoji_palette/selection_controller.hpp"
 #include "emoji_palette/utf8.hpp"
+#include "shortcut_matcher.hpp"
 
 #include <algorithm>
 #include <array>
@@ -31,6 +32,8 @@
 #include <fcitx/addonmanager.h>
 #include <fcitx/event.h>
 #include <fcitx/inputcontext.h>
+#include <fcitx/inputmethodgroup.h>
+#include <fcitx/inputmethodmanager.h>
 #include <fcitx/instance.h>
 
 namespace {
@@ -144,14 +147,22 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
             });
 
         eventHandlers_.emplace_back(instance_->watchEvent(
-            fcitx::EventType::InputContextKeyEvent, fcitx::EventWatcherPhase::Default,
+            fcitx::EventType::InputContextKeyEvent, fcitx::EventWatcherPhase::PreInputMethod,
             [this](fcitx::Event& event) {
                 auto& keyEvent = static_cast<fcitx::KeyEvent&>(event);
-                if (!keyEvent.isRelease() && keyEvent.key().checkKeyList(*config_.triggerKey)) {
+                if (controller_.active()) {
+                    handleActiveKey(keyEvent);
+                    return;
+                }
+                if (!keyEvent.isRelease() &&
+                    shortcutMatcher_.matches(keyEvent.key(), keyEvent.origKey())) {
                     show(*keyEvent.inputContext());
                     keyEvent.filterAndAccept();
                 }
             }));
+        eventHandlers_.emplace_back(instance_->watchEvent(
+            fcitx::EventType::InputMethodGroupChanged, fcitx::EventWatcherPhase::Default,
+            [this](fcitx::Event&) { reloadLayout(); }));
 
         const auto reset = [this](CancelReason reason, fcitx::Event& event) {
             auto& contextEvent = static_cast<fcitx::InputContextEvent&>(event);
@@ -171,25 +182,37 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
         eventHandlers_.emplace_back(instance_->watchEvent(
             fcitx::EventType::InputContextDestroyed, fcitx::EventWatcherPhase::Default,
             [reset](fcitx::Event& event) { reset(CancelReason::ContextDestroyed, event); }));
-        eventHandlers_.emplace_back(instance_->watchEvent(
-            fcitx::EventType::InputContextKeyEvent, fcitx::EventWatcherPhase::PreInputMethod,
-            [this](fcitx::Event& event) {
-                handleActiveKey(static_cast<fcitx::KeyEvent&>(event));
-            }));
 
         reloadConfig();
     }
 
-    void reloadConfig() override { fcitx::readAsIni(config_, "conf/emojipalette.conf"); }
+    void reloadConfig() override {
+        fcitx::readAsIni(config_, "conf/emojipalette.conf");
+        reloadShortcuts();
+    }
 
     const fcitx::Configuration* getConfig() const override { return &config_; }
 
     void setConfig(const fcitx::RawConfig& config) override {
         config_.load(config, true);
+        reloadShortcuts();
         fcitx::safeSaveAsIni(config_, "conf/emojipalette.conf");
     }
 
   private:
+    void reloadShortcuts() {
+        shortcutMatcher_.setShortcuts(*config_.triggerKey);
+        reloadLayout();
+    }
+
+    void reloadLayout() {
+        const auto& manager = instance_->inputMethodManager();
+        if (manager.groupCount() == 0) {
+            return;
+        }
+        shortcutMatcher_.setLayout(manager.currentGroup().defaultLayout());
+    }
+
     void show(fcitx::InputContext& context) {
         cancel(CancelReason::User, true);
         origin_ = context.watch();
@@ -431,6 +454,7 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
     std::vector<std::unique_ptr<fcitx::HandlerTableEntry<fcitx::EventHandler>>> eventHandlers_;
     emoji_palette::EmojiCatalog catalog_;
     emoji_palette::SelectionController controller_;
+    emoji_palette::addon::ShortcutMatcher shortcutMatcher_;
     emoji_palette::ipc::PeerSession session_;
     fcitx::TrackableObjectReference<fcitx::InputContext> origin_;
     std::uint32_t commandSequence_ = 0;

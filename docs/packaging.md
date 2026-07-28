@@ -90,7 +90,8 @@ Install the packaging dependencies in Fedora 44:
 
 ```bash
 sudo dnf install cmake desktop-file-utils fcitx5-devel gcc-c++ git \
-  google-noto-color-emoji-fonts libappstream-glib layer-shell-qt-devel \
+  google-noto-color-emoji-fonts libappstream-glib libxkbcommon-devel \
+  layer-shell-qt-devel \
   ninja-build python3 qt6-linguist qt6-qtbase-devel qt6-qttools-devel \
   reuse rpm-build rpmlint
 ```
@@ -98,22 +99,17 @@ sudo dnf install cmake desktop-file-utils fcitx5-devel gcc-c++ git \
 From a clean checkout:
 
 ```bash
-version=0.1.0-rc.2
-mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
-git archive \
-  --format=tar.gz \
-  --prefix="fcitx5-emoji-palette-${version}/" \
-  --output="rpmbuild/SOURCES/v${version}.tar.gz" \
-  HEAD
-cp packaging/fedora/fcitx5-emoji-palette.spec rpmbuild/SPECS/
-rpmbuild -ba \
-  --define "_topdir $PWD/rpmbuild" \
-  rpmbuild/SPECS/fcitx5-emoji-palette.spec
+packaging/fedora/build-test-rpms.sh
 rpmlint \
-  rpmbuild/SPECS/fcitx5-emoji-palette.spec \
-  rpmbuild/SRPMS/*.src.rpm \
-  rpmbuild/RPMS/*/*.rpm
+  build/rpmbuild-*/SPECS/fcitx5-emoji-palette.spec \
+  build/rpmbuild-*/SRPMS/*.src.rpm \
+  build/rpmbuild-*/RPMS/*/*.rpm
 ```
 
-Do not install an RPM produced from an untrusted checkout. The binary RPM and
-SRPM appear below `rpmbuild/RPMS/` and `rpmbuild/SRPMS/`.
+The helper refuses a dirty worktree and writes the spec's reviewed base
+`Release` below a commit-specific `build/rpmbuild-SHA/` directory. It refuses
+to replace an existing artifact directory, so different source commits cannot
+silently reuse build output. Record the source commit and RPM checksum with any
+test result.
+
+Do not install an RPM produced from an untrusted checkout.

@@ -22,8 +22,8 @@ jobs:
       - name: Install packaging dependencies
         run: >
           dnf install -y cmake dbus-daemon dbus-tools desktop-file-utils
-          fcitx5-devel gcc-c++ git google-noto-color-emoji-fonts libappstream-glib
-          layer-shell-qt-devel ninja-build procps-ng python3 qt6-linguist
+          fcitx5 fcitx5-devel gcc-c++ git google-noto-color-emoji-fonts libappstream-glib
+          libxkbcommon-devel layer-shell-qt-devel ninja-build procps-ng python3 qt6-linguist
           qt6-qtbase-devel qt6-qttools-devel reuse rpm-build rpmlint
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -40,10 +40,10 @@ jobs:
             HEAD
           cp packaging/fedora/fcitx5-emoji-palette.spec rpmbuild/SPECS/
       - name: Build RPM and SRPM
-        run: >
-          rpmbuild -ba
-          --define "_topdir $PWD/rpmbuild"
-          rpmbuild/SPECS/fcitx5-emoji-palette.spec
+        run: |
+          rpmbuild -ba \
+            --define "_topdir $PWD/rpmbuild" \
+            rpmbuild/SPECS/fcitx5-emoji-palette.spec
       - name: Run rpmlint
         run: >
           rpmlint
@@ -52,35 +52,27 @@ jobs:
           rpmbuild/RPMS/*/*.rpm
       - name: Test packaged installation
         run: |
-          dnf install -y \
-            rpmbuild/RPMS/*/fcitx5-emoji-palette-0.1.0~rc2-1.fc44.*.rpm
-          test -x /usr/libexec/fcitx5-emoji-palette-ui
-          test -f /usr/share/fcitx5/addon/emojipalette.conf
-          test -f /usr/share/dbus-1/services/org.fcitx.Fcitx5.EmojiPalette1.service
-          fcitx5 -D --disable=all --enable=keyboard,dbus,emojipalette \
-            --verbose '*'=5 >fcitx.log 2>&1 &
-          fcitx_pid=$!
-          for attempt in {1..20}; do
-            if grep -q "Call loadAddon() with emojipalette" fcitx.log; then
-              break
-            fi
-            sleep 0.25
+          package_path=$(
+            printf '%s\n' \
+              rpmbuild/RPMS/*/fcitx5-emoji-palette-0.1.0~rc2-2.fc44.*.rpm
+          )
+          rpm -qp --requires "$package_path" | grep -Fq 'libxkbcommon.so.0()(64bit)'
+          dnf install -y "$package_path"
+          package_nevra=$(rpm -q fcitx5-emoji-palette)
+          for installed_path in \
+            /usr/lib64/fcitx5/libemoji-palette.so \
+            /usr/libexec/fcitx5-emoji-palette-ui \
+            /usr/share/fcitx5/addon/emojipalette.conf \
+            /usr/share/dbus-1/services/org.fcitx.Fcitx5.EmojiPalette1.service; do
+            test "$(rpm -qf "$installed_path")" = "$package_nevra"
           done
-          grep -q "Call loadAddon() with emojipalette" fcitx.log
-          kill -0 "$fcitx_pid"
-          ! grep -E "Failed to load addon: emojipalette|Failed to load library.*emoji" fcitx.log
-          kill "$fcitx_pid"
-          wait "$fcitx_pid" || true
-          QT_QPA_PLATFORM=minimal dbus-run-session -- bash -euo pipefail -c '
-            gdbus introspect \
-              --session \
-              --dest org.fcitx.Fcitx5.EmojiPalette1 \
-              --object-path /org/fcitx/Fcitx5/EmojiPalette1 >introspection.txt
-            grep -q "Exchange" introspection.txt
-            grep -q "Frame" introspection.txt
-            helper_pid="$(pgrep -f "^/usr/libexec/fcitx5-emoji-palette-ui$")"
-            kill "$helper_pid"
-          '
+          tests/packaged_runtime_smoke.sh
+          dnf remove -y fcitx5-emoji-palette
+          test ! -e /usr/lib64/fcitx5/libemoji-palette.so
+          test ! -e /usr/libexec/fcitx5-emoji-palette-ui
+          tests/packaged_runtime_smoke.sh --fcitx-only
+          dnf install -y "$package_path"
+          tests/packaged_runtime_smoke.sh
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: fedora-44-rpms
