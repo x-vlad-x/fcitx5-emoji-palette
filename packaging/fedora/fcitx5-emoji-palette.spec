@@ -1,6 +1,6 @@
 %global upstream_version 0.1.0
 %global prerelease_version rc.2
-%global base_release 2
+%global base_release 3
 
 Name:           fcitx5-emoji-palette
 Version:        0.1.0~rc2
@@ -68,6 +68,9 @@ appstream-util validate-relax --nonet \
 %{_metainfodir}/org.fcitx.Fcitx5.EmojiPalette.metainfo.xml
 
 %changelog
+* Tue Jul 28 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-3
+- Keep the picker active while using inline grid settings
+
 * Tue Jul 28 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-2
 - Prevent addon startup before Fcitx input-method groups are initialized
 

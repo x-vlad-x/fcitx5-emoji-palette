@@ -387,7 +387,7 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
         const auto& key = event.key();
         std::optional<CommandKind> command;
         if (key.check(FcitxKey_Escape)) {
-            cancel(CancelReason::User, true);
+            sendCommand(CommandKind::Cancel);
             event.accept();
             return;
         }

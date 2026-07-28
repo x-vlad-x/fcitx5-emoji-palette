@@ -13,11 +13,11 @@
 #include <QLabel>
 #include <QListView>
 #include <QLoggingCategory>
-#include <QMenu>
 #include <QPainter>
 #include <QScreen>
 #include <QScrollArea>
 #include <QSettings>
+#include <QSignalBlocker>
 #include <QStyle>
 #include <QStyleOptionViewItem>
 #include <QStyledItemDelegate>
@@ -137,6 +137,7 @@ PaletteWindow::PaletteWindow(const EmojiCatalog& catalog, std::filesystem::path 
     columns_ = std::clamp(settings_->value(QStringLiteral("Ui/Columns"), 9).toInt(), 6, 14);
     rows_ = std::clamp(settings_->value(QStringLiteral("Ui/Rows"), 7).toInt(), 4, 10);
     buildUi();
+    qApp->installEventFilter(this);
     setCategory(categoryIndex_);
 }
 
@@ -152,6 +153,7 @@ void PaletteWindow::showPalette(const ipc::Show& request) {
 }
 
 void PaletteWindow::hidePalette() {
+    setSettingsPanelVisible(false);
     hide();
     variantsPanel_->hide();
 }
@@ -171,6 +173,10 @@ void PaletteWindow::handleCommand(const ipc::Command& command) {
         return;
     }
     if (command.kind == ipc::CommandKind::Cancel) {
+        if (settingsPanel_->isVisible()) {
+            setSettingsPanelVisible(false);
+            return;
+        }
         emit cancellationRequested(ipc::CancelReason::User);
         return;
     }
@@ -226,6 +232,22 @@ void PaletteWindow::handleCommand(const ipc::Command& command) {
 
 const EmojiListModel& PaletteWindow::model() const { return model_; }
 
+bool PaletteWindow::eventFilter(QObject* watched, QEvent* event) {
+    if (settingsPanel_ != nullptr && settingsPanel_->isVisible() &&
+        event->type() == QEvent::MouseButtonPress) {
+        auto* widget = qobject_cast<QWidget*>(watched);
+        const bool insidePanel =
+            widget != nullptr && (widget == settingsPanel_ || settingsPanel_->isAncestorOf(widget));
+        const bool onButton = widget != nullptr &&
+                              (widget == settingsButton_ || settingsButton_->isAncestorOf(widget));
+        if (widget != nullptr && !insidePanel && !onButton) {
+            setSettingsPanelVisible(false);
+            return true;
+        }
+    }
+    return QWidget::eventFilter(watched, event);
+}
+
 void PaletteWindow::buildUi() {
     auto* outer = new QVBoxLayout(this);
     outer->setContentsMargins(8, 8, 8, 8);
@@ -243,14 +265,47 @@ void PaletteWindow::buildUi() {
     searchLabel_->setAccessibleName(tr("Search query"));
     searchRow->addWidget(searchLabel_, 1);
 
-    auto* settingsButton = new QToolButton(surface);
-    settingsButton->setText(QStringLiteral("⚙"));
-    settingsButton->setToolTip(tr("Grid settings"));
-    settingsButton->setAccessibleName(tr("Grid settings"));
-    settingsButton->setFocusPolicy(Qt::NoFocus);
-    settingsButton->setPopupMode(QToolButton::InstantPopup);
-    searchRow->addWidget(settingsButton);
+    settingsButton_ = new QToolButton(surface);
+    settingsButton_->setText(QStringLiteral("⚙ ▾"));
+    settingsButton_->setToolTip(tr("Grid settings"));
+    settingsButton_->setAccessibleName(tr("Grid settings"));
+    settingsButton_->setCheckable(true);
+    settingsButton_->setFocusPolicy(Qt::NoFocus);
+    searchRow->addWidget(settingsButton_);
     layout->addLayout(searchRow);
+
+    settingsPanel_ = new QFrame(surface);
+    settingsPanel_->setObjectName(QStringLiteral("settingsPanel"));
+    settingsPanel_->setAccessibleName(tr("Grid settings"));
+    settingsPanel_->setFrameShape(QFrame::StyledPanel);
+    auto* settingsLayout = new QHBoxLayout(settingsPanel_);
+    settingsLayout->setContentsMargins(6, 4, 6, 4);
+    settingsLayout->setSpacing(4);
+    settingsLayout->addWidget(new QLabel(tr("Grid size:"), settingsPanel_));
+    auto* sizeGroup = new QButtonGroup(settingsPanel_);
+    sizeGroup->setExclusive(true);
+    const auto sizes = std::array{
+        std::tuple{tr("Compact"), 44, QStringLiteral("settingsSizeCompact")},
+        std::tuple{tr("Comfortable"), 52, QStringLiteral("settingsSizeComfortable")},
+        std::tuple{tr("Large"), 64, QStringLiteral("settingsSizeLarge")},
+    };
+    for (const auto& [label, size, objectName] : sizes) {
+        auto* button = new QToolButton(settingsPanel_);
+        button->setObjectName(objectName);
+        button->setText(label);
+        button->setAccessibleName(label);
+        button->setCheckable(true);
+        button->setChecked(cellSize_ == size);
+        button->setFocusPolicy(Qt::NoFocus);
+        sizeGroup->addButton(button);
+        settingsLayout->addWidget(button);
+        connect(button, &QToolButton::clicked, this, [this, size]() { applyCellSize(size); });
+    }
+    settingsLayout->addStretch(1);
+    settingsPanel_->hide();
+    layout->addWidget(settingsPanel_);
+    connect(settingsButton_, &QToolButton::clicked, this,
+            [this](bool checked) { setSettingsPanelVisible(checked); });
 
     auto* categoryScroll = new QScrollArea(surface);
     categoryScroll->setWidgetResizable(true);
@@ -339,17 +394,14 @@ void PaletteWindow::buildUi() {
     connect(favoriteButton_, &QToolButton::clicked, this, &PaletteWindow::toggleCurrentFavorite);
     connect(variantsButton_, &QToolButton::clicked, this, &PaletteWindow::showCurrentVariants);
 
-    auto* settingsMenu = new QMenu(settingsButton);
-    for (const auto& [label, size] : std::array<std::pair<QString, int>, 3>{
-             {{tr("Compact"), 44}, {tr("Comfortable"), 52}, {tr("Large"), 64}}}) {
-        auto* action = settingsMenu->addAction(label);
-        action->setCheckable(true);
-        action->setChecked(cellSize_ == size);
-        connect(action, &QAction::triggered, this, [this, size]() { applyCellSize(size); });
-    }
-    settingsButton->setMenu(settingsMenu);
-
     resize(columns_ * (cellSize_ + 2) + 38, rows_ * (cellSize_ + 2) + 154);
+}
+
+void PaletteWindow::setSettingsPanelVisible(bool visible) {
+    settingsPanel_->setVisible(visible);
+    const QSignalBlocker blocker(settingsButton_);
+    settingsButton_->setChecked(visible);
+    settingsButton_->setText(visible ? QStringLiteral("⚙ ▴") : QStringLiteral("⚙ ▾"));
 }
 
 void PaletteWindow::setCategory(std::size_t index) {

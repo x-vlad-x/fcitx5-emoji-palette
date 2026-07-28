@@ -51,6 +51,12 @@ On Wayland, LayerShellQt creates a top-layer surface with no exclusive zone and
 `KeyboardInteractivityNone`. On X11, a non-activating frameless tool window is
 used.
 
+Transient controls that must preserve the source input context, including grid
+settings, expand inside the existing palette surface. They do not use a
+`QMenu`, dialog, or other top-level popup. Escape is forwarded as a logical
+command so the helper can close an open child panel first; when no child panel
+is open, the same command cancels the transaction.
+
 ### Data
 
 Pinned Unicode Emoji and CLDR inputs are converted into deterministic generated

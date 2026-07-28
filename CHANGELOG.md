@@ -4,6 +4,8 @@ All notable user-visible changes are documented here.
 
 ## Unreleased
 
+- Kept the picker and its source input transaction active while the inline grid
+  settings are open, including staged Escape and outside-click dismissal.
 - Made configured activation shortcuts follow the physical key across keyboard
   layout changes, including shifted letters, without leaking the translated
   character to the focused application.
