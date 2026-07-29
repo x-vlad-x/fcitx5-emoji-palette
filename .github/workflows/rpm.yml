@@ -53,9 +53,10 @@ jobs:
       - name: Test packaged installation
         run: |
           package_path=$(
-            printf '%s\n' \
-              rpmbuild/RPMS/*/fcitx5-emoji-palette-0.1.0~rc2-3.fc44.*.rpm
+            rpmspec -q --qf 'rpmbuild/RPMS/%{ARCH}/%{NAME}-%{EVR}.%{ARCH}.rpm\n' \
+              rpmbuild/SPECS/fcitx5-emoji-palette.spec
           )
+          test -f "$package_path"
           rpm -qp --requires "$package_path" | grep -Fq 'libxkbcommon.so.0()(64bit)'
           dnf install -y "$package_path"
           package_nevra=$(rpm -q fcitx5-emoji-palette)

@@ -1,6 +1,6 @@
 %global upstream_version 0.1.0
 %global prerelease_version rc.2
-%global base_release 4
+%global base_release 5
 
 Name:           fcitx5-emoji-palette
 Version:        0.1.0~rc2
@@ -71,6 +71,9 @@ appstream-util validate-relax --nonet \
 %{_metainfodir}/org.fcitx.Fcitx5.EmojiPalette.metainfo.xml
 
 %changelog
+* Wed Jul 29 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-5
+- Resolve the packaging test target from the spec instead of a fixed release
+
 * Wed Jul 29 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-4
 - Draw labelled placeholders for emoji the installed font cannot render
 
