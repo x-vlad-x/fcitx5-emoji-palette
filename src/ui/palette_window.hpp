@@ -31,6 +31,8 @@ class PaletteWindow final : public QWidget {
                   const QString& settingsPath, QWidget* parent = nullptr);
 
     void showPalette(const ipc::Show& request);
+    // An empty probe restores detection against the current application font.
+    void setGlyphProbe(GlyphProbe probe);
     void hidePalette();
     void handleCommand(const ipc::Command& command);
 
@@ -42,6 +44,7 @@ class PaletteWindow final : public QWidget {
 
   protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
+    void changeEvent(QEvent* event) override;
 
   private:
     void buildUi();

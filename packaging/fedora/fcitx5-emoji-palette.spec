@@ -1,6 +1,6 @@
 %global upstream_version 0.1.0
 %global prerelease_version rc.2
-%global base_release 3
+%global base_release 4
 
 Name:           fcitx5-emoji-palette
 Version:        0.1.0~rc2
@@ -26,6 +26,9 @@ BuildRequires:  layer-shell-qt-devel >= 6.6
 BuildRequires:  reuse
 
 Requires:       fcitx5 >= 5.1
+# Fedora publishes no generic font(:lang=und-zsye) provide, so the concrete
+# emoji font package is named. Without it every catalog entry would fall back
+# to a placeholder tile.
 Requires:       google-noto-color-emoji-fonts
 
 %description
@@ -68,6 +71,9 @@ appstream-util validate-relax --nonet \
 %{_metainfodir}/org.fcitx.Fcitx5.EmojiPalette.metainfo.xml
 
 %changelog
+* Wed Jul 29 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-4
+- Draw labelled placeholders for emoji the installed font cannot render
+
 * Tue Jul 28 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-3
 - Keep the picker active while using inline grid settings
 

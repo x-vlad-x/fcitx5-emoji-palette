@@ -4,6 +4,9 @@ All notable user-visible changes are documented here.
 
 ## Unreleased
 
+- Replaced missing-glyph boxes with labelled placeholder tiles for emoji the
+  installed font cannot draw, keeping the catalog complete and committing the
+  exact original Unicode sequence.
 - Kept the picker and its source input transaction active while the inline grid
   settings are open, including staged Escape and outside-click dismissal.
 - Made configured activation shortcuts follow the physical key across keyboard

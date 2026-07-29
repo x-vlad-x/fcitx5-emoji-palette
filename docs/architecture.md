@@ -68,6 +68,19 @@ directories. Writes use `QSaveFile` or an equivalent same-directory
 write-and-rename implementation. Invalid files are quarantined or ignored and
 replaced with safe defaults.
 
+### Rendering
+
+Catalog content and glyph availability are separate concerns. The core library
+decides whether a sequence is renderable against a supplied code-point probe,
+ignoring joiners, variation selectors and tag characters, which shape their
+neighbours instead of carrying glyphs. The helper supplies the real probe
+through `QFontMetricsF::inFontUcs4()`, which resolves the fontconfig fallback
+chain, and caches the answer per code point.
+
+Entries the installed font cannot draw are painted as labelled placeholder
+tiles. This affects presentation only; the committed sequence is always the
+original catalog sequence.
+
 ## Selection transaction
 
 1. A key event matching the configured shortcut's keysym or derived physical

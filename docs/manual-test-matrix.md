@@ -20,6 +20,9 @@ No row may be marked passed without execution on the target desktop.
 | Rapid repeated open and close | Not run | |
 | Source application closes while open | Not run | |
 | Fcitx5 restarts while helper runs | Not run | |
+| Emoji without a glyph in the installed font | Not run | |
+| ZWJ sequence whose joiner element has no glyph | Not run | |
+| Placeholder tiles in light and dark Plasma themes | Not run | |
 | Helper crash and automatic recovery | Not run | |
 
 ## Required invariants
@@ -33,4 +36,7 @@ For each applicable scenario, record evidence that:
   after a live keyboard-layout change;
 - selection is never committed to a different window;
 - the popup does not take keyboard focus;
-- Fcitx5 remains operational after the helper crashes.
+- Fcitx5 remains operational after the helper crashes;
+- an emoji the installed font cannot draw shows a labelled placeholder
+  rather than a missing-glyph box, and still commits its exact original
+  Unicode sequence.

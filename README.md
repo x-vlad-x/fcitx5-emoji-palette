@@ -24,6 +24,8 @@ desktop manual test matrix has not been executed.
 - Bounded, versioned, replay-resistant D-Bus protocol between the addon and
   the crash-isolated Qt helper.
 - Atomic user-state writes and recovery from a damaged state file.
+- Labelled placeholders instead of missing-glyph boxes for emoji the
+  installed font cannot draw.
 
 ## Requirements
 
@@ -31,11 +33,35 @@ desktop manual test matrix has not been executed.
 - libxkbcommon 1.0 or newer
 - Qt 6.6 or newer
 - LayerShellQt 6.6 or newer
-- Noto Color Emoji
+- Noto Color Emoji, or another emoji font (see *Emoji font coverage*)
 - A Wayland compositor with `wlr-layer-shell` support for the primary path
 
 The X11 fallback uses a non-focusable tool window, but the first prerelease is
 validated primarily for KDE Plasma on Wayland.
+
+## Emoji font coverage
+
+The catalog is fixed at Unicode Emoji 17.0 and does not depend on the installed
+font. Which entries can be *drawn* does depend on it, because emoji fonts follow
+their own release schedule.
+
+`google-noto-color-emoji-fonts-20250623`, current on Fedora 44 and Bazzite 44,
+stops at Emoji 16.0. Seven Emoji 17.0 code points therefore have no glyph:
+U+1F6D8, U+1FA8A, U+1FA8E, U+1FAC8, U+1FACD, U+1FAEA and U+1FAEF. Sixty-seven
+catalog entries reference them, most of them wrestling sequences joined by
+U+1FAEF.
+
+Rather than hiding those entries or shipping a font, the picker detects real
+glyph availability through the Qt font fallback chain and draws a dashed
+placeholder tile labelled with the missing code point, for example `1FAEA`. The
+localized name stays in the tooltip, the status line and the accessible text,
+together with a note that the installed emoji font has no glyph.
+
+Selecting such an entry commits the exact original Unicode sequence, unchanged.
+Placeholders disappear on their own once the installed emoji font gains the
+glyphs; nothing needs to be reconfigured.
+
+See `docs/adr/0005-font-coverage-fallback.md` for the full decision.
 
 ## Install on Fedora
 

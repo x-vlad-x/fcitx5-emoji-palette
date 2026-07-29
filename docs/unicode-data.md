@@ -8,6 +8,16 @@ English, German, and Russian names and keywords come from CLDR 48.2 annotations
 and derived annotations. Isolated emoji components are excluded from the
 palette. Fully-qualified ZWJ sequences and variation selectors remain intact.
 
+## Font coverage
+
+The supported catalog version is a property of this repository, not of the
+machine. Emoji fonts lag behind Unicode, so entries may exist that the installed
+font cannot draw. Those entries are kept, and the helper paints a labelled
+placeholder for them instead of a missing-glyph box.
+
+Never drop generated entries because the current font lacks a glyph. Coverage is
+resolved at runtime and improves on its own when the font is updated.
+
 ## Updating
 
 First update every version, URL, and independently obtained SHA-256 checksum in

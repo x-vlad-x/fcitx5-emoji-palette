@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 namespace {
 
@@ -59,6 +60,8 @@ class HelperTests final : public QObject {
   private slots:
     void localizedModelSearch();
     void configurationMigration();
+    void missingGlyphFallbackIsReported();
+    void missingGlyphCommitsOriginalSequence();
     void settingsPanelStateTransitions();
     void settingsPanelPreservesSession();
     void sessionSelectsOnce();
@@ -96,6 +99,93 @@ void HelperTests::configurationMigration() {
     QCOMPARE(migrated.value(QStringLiteral("SchemaVersion")).toInt(), 1);
     QCOMPARE(migrated.value(QStringLiteral("Ui/CellSize")).toInt(), 64);
     QVERIFY(!migrated.contains(QStringLiteral("cellSize")));
+}
+
+void HelperTests::missingGlyphFallbackIsReported() {
+    using Model = emoji_palette::ui::EmojiListModel;
+    emoji_palette::EmojiCatalog catalog;
+    emoji_palette::PersistentState state;
+    Model model(catalog, state);
+    model.setGlyphProbe([](std::uint32_t codepoint) {
+        return codepoint != 0x1FAEA && codepoint != 0x1FAEF && codepoint != 0x1FAC8;
+    });
+
+    model.setSearch(QStringLiteral("distorted face"), emoji_palette::Locale::English);
+    QVERIFY(model.rowCount() > 0);
+    const auto distorted = model.index(0, 0);
+    QCOMPARE(distorted.data(Qt::DisplayRole).toString(), QString::fromUtf8("🫪"));
+    QCOMPARE(distorted.data(Model::SequenceRole).toString(), QString::fromUtf8("🫪"));
+    QCOMPARE(distorted.data(Model::RenderableRole).toBool(), false);
+    QCOMPARE(distorted.data(Model::MissingGlyphLabelRole).toString(), QStringLiteral("1FAEA"));
+    const auto note = distorted.data(Qt::ToolTipRole).toString();
+    QVERIFY(note.contains(QStringLiteral("distorted face")));
+    QVERIFY(note != QStringLiteral("distorted face"));
+    QCOMPARE(distorted.data(Qt::AccessibleTextRole).toString(), note);
+
+    model.setSearch(QStringLiteral("grinning face"), emoji_palette::Locale::English);
+    QVERIFY(model.rowCount() > 0);
+    const auto grinning = model.index(0, 0);
+    QCOMPARE(grinning.data(Qt::DisplayRole).toString(), QString::fromUtf8("😀"));
+    QCOMPARE(grinning.data(Model::RenderableRole).toBool(), true);
+    QVERIFY(grinning.data(Model::MissingGlyphLabelRole).toString().isEmpty());
+    QCOMPARE(grinning.data(Qt::ToolTipRole).toString(), QStringLiteral("grinning face"));
+
+    model.setSearch(QStringLiteral("wrestling"), emoji_palette::Locale::English);
+    int joined = 0;
+    for (int row = 0; row < model.rowCount(); ++row) {
+        const auto index = model.index(row, 0);
+        if (!index.data(Qt::DisplayRole).toString().contains(QString::fromUtf8("🫯"))) {
+            continue;
+        }
+        ++joined;
+        QCOMPARE(index.data(Model::RenderableRole).toBool(), false);
+        QCOMPARE(index.data(Model::MissingGlyphLabelRole).toString(), QStringLiteral("1FAEF"));
+    }
+    QVERIFY(joined > 0);
+
+    // A complete font must leave every entry alone.
+    model.setGlyphProbe([](std::uint32_t) { return true; });
+    model.setSearch(QStringLiteral("distorted face"), emoji_palette::Locale::English);
+    const auto complete = model.index(0, 0);
+    QCOMPARE(complete.data(Model::RenderableRole).toBool(), true);
+    QVERIFY(complete.data(Model::MissingGlyphLabelRole).toString().isEmpty());
+    QCOMPARE(complete.data(Qt::ToolTipRole).toString(), QStringLiteral("distorted face"));
+}
+
+void HelperTests::missingGlyphCommitsOriginalSequence() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    emoji_palette::EmojiCatalog catalog;
+    emoji_palette::ui::PaletteWindow window(
+        catalog, std::filesystem::path(temporary.path().toStdString()) / "state",
+        temporary.filePath(QStringLiteral("settings.ini")));
+    window.setGlyphProbe([](std::uint32_t codepoint) {
+        return codepoint != 0x1FAEA && codepoint != 0x1FAEF && codepoint != 0x1FAC8;
+    });
+    QSignalSpy selection(&window, &emoji_palette::ui::PaletteWindow::selectionRequested);
+
+    const auto id = transaction(11);
+    window.showPalette(
+        {id, {10, 10, 2, 20}, {0, 0, 1920, 1080}, emoji_palette::Locale::English, 100, false});
+    window.handleCommand({id, 1, emoji_palette::ipc::CommandKind::SearchText, "distorted face"});
+    QVERIFY(window.model().rowCount() > 0);
+    const auto index = window.model().index(0, 0);
+    QCOMPARE(index.data(emoji_palette::ui::EmojiListModel::RenderableRole).toBool(), false);
+
+    window.handleCommand({id, 2, emoji_palette::ipc::CommandKind::Select, {}});
+    QCOMPARE(selection.count(), 1);
+    const auto committed = selection.takeFirst().at(0).toString();
+    QCOMPARE(committed, QString::fromUtf8("🫪"));
+    QCOMPARE(committed.toUtf8(), QByteArray("\xF0\x9F\xAB\xAA"));
+    QVERIFY(!committed.contains(QStringLiteral("1FAEA")));
+    QVERIFY(catalog.contains(std::string_view(
+        committed.toUtf8().constData(), static_cast<std::size_t>(committed.toUtf8().size()))));
+
+    // The same sequence must reach the source application when the font is complete.
+    window.setGlyphProbe([](std::uint32_t) { return true; });
+    window.handleCommand({id, 3, emoji_palette::ipc::CommandKind::Select, {}});
+    QCOMPARE(selection.count(), 1);
+    QCOMPARE(selection.takeFirst().at(0).toString(), QString::fromUtf8("🫪"));
 }
 
 void HelperTests::settingsPanelStateTransitions() {

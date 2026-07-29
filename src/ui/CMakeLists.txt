@@ -7,6 +7,7 @@ add_library(
     emoji-palette-ui
     STATIC
     emoji_list_model.cpp
+    font_coverage.cpp
     palette_session.cpp
     palette_window.cpp
 )
