@@ -35,6 +35,7 @@ add_library(
     emoji-palette-core
     STATIC
     src/core/geometry.cpp
+    src/core/glyph_coverage.cpp
     src/core/keyboard.cpp
     src/core/state.cpp
     src/core/utf8.cpp

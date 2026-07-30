@@ -7,6 +7,7 @@
 #include <QButtonGroup>
 #include <QCursor>
 #include <QDateTime>
+#include <QFontMetricsF>
 #include <QFrame>
 #include <QGuiApplication>
 #include <QHBoxLayout>
@@ -29,6 +30,7 @@
 #include <array>
 #include <chrono>
 #include <string>
+#include <utility>
 
 namespace emoji_palette::ui {
 
@@ -61,17 +63,25 @@ class EmojiDelegate final : public QStyledItemDelegate {
         style->drawControl(QStyle::CE_ItemViewItem, &item, painter, widget);
 
         painter->save();
-        QFont font = option.font;
-        font.setPointSizeF(std::max(14.0, static_cast<double>(cellSize_) * 0.43));
-        painter->setFont(font);
-        painter->setPen(option.palette.color(option.state.testFlag(QStyle::State_Selected)
-                                                 ? QPalette::HighlightedText
-                                                 : QPalette::Text));
-        painter->drawText(option.rect, Qt::AlignCenter, index.data(Qt::DisplayRole).toString());
-        if (index.data(Qt::UserRole).toBool()) {
+        const QColor foreground = option.palette.color(option.state.testFlag(QStyle::State_Selected)
+                                                           ? QPalette::HighlightedText
+                                                           : QPalette::Text);
+        const auto renderable = index.data(EmojiListModel::RenderableRole);
+        if (renderable.isValid() && !renderable.toBool()) {
+            paintMissingGlyph(painter, option, foreground,
+                              index.data(EmojiListModel::MissingGlyphLabelRole).toString());
+        } else {
+            QFont font = option.font;
+            font.setPointSizeF(std::max(14.0, static_cast<double>(cellSize_) * 0.43));
+            painter->setFont(font);
+            painter->setPen(foreground);
+            painter->drawText(option.rect, Qt::AlignCenter, index.data(Qt::DisplayRole).toString());
+        }
+        if (index.data(EmojiListModel::FavoriteRole).toBool()) {
             QFont markerFont = option.font;
             markerFont.setPointSizeF(std::max(7.0, static_cast<double>(cellSize_) * 0.17));
             painter->setFont(markerFont);
+            painter->setPen(foreground);
             painter->drawText(option.rect.adjusted(3, 2, -3, -2), Qt::AlignTop | Qt::AlignRight,
                               QStringLiteral("★"));
         }
@@ -79,6 +89,28 @@ class EmojiDelegate final : public QStyledItemDelegate {
     }
 
   private:
+    // Documented fallback for a code point that no installed font can draw. The
+    // tile identifies the entry instead of leaving a missing-glyph box, and never
+    // participates in what the picker commits.
+    void paintMissingGlyph(QPainter* painter, const QStyleOptionViewItem& option,
+                           const QColor& foreground, const QString& label) const {
+        const auto inset = std::max(3.0, static_cast<double>(cellSize_) * 0.09);
+        const QRectF box = QRectF(option.rect).adjusted(inset, inset, -inset, -inset);
+        QPen border(foreground);
+        border.setStyle(Qt::DashLine);
+        border.setWidthF(1.0);
+        painter->setRenderHint(QPainter::Antialiasing, true);
+        painter->setPen(border);
+        painter->drawRoundedRect(box, 3.0, 3.0);
+        QFont labelFont = option.font;
+        labelFont.setPointSizeF(std::max(6.0, static_cast<double>(cellSize_) * 0.185));
+        painter->setFont(labelFont);
+        painter->setPen(foreground);
+        const QFontMetricsF metrics(labelFont);
+        painter->drawText(box, Qt::AlignCenter,
+                          metrics.elidedText(label, Qt::ElideRight, box.width() - 2.0));
+    }
+
     int cellSize_;
 };
 
@@ -231,6 +263,25 @@ void PaletteWindow::handleCommand(const ipc::Command& command) {
 }
 
 const EmojiListModel& PaletteWindow::model() const { return model_; }
+
+void PaletteWindow::setGlyphProbe(GlyphProbe probe) {
+    model_.setGlyphProbe(std::move(probe));
+    if (grid_ != nullptr) {
+        grid_->viewport()->update();
+        updateSelection();
+    }
+}
+
+void PaletteWindow::changeEvent(QEvent* event) {
+    QWidget::changeEvent(event);
+    if (event->type() != QEvent::FontChange) {
+        return;
+    }
+    model_.refreshSystemGlyphProbe();
+    if (grid_ != nullptr) {
+        grid_->viewport()->update();
+    }
+}
 
 bool PaletteWindow::eventFilter(QObject* watched, QEvent* event) {
     if (settingsPanel_ != nullptr && settingsPanel_->isVisible() &&
@@ -491,9 +542,12 @@ void PaletteWindow::showCurrentVariants() {
     }
     for (const auto* variant : variants) {
         auto* button = new QToolButton(variantsPanel_);
-        button->setText(fromUtf8(variant->sequence));
-        button->setToolTip(
-            fromUtf8(variant->annotations[static_cast<std::size_t>(request_.locale)].name));
+        const auto coverage = model_.coverageFor(variant->sequence);
+        const auto name =
+            fromUtf8(variant->annotations[static_cast<std::size_t>(request_.locale)].name);
+        button->setText(coverage.renderable ? fromUtf8(variant->sequence)
+                                            : model_.missingGlyphText(coverage));
+        button->setToolTip(model_.annotatedName(name, coverage));
         button->setAccessibleName(button->toolTip());
         button->setFocusPolicy(Qt::NoFocus);
         connect(button, &QToolButton::clicked, this,

@@ -30,4 +30,8 @@
     <message><source>Flags</source><translation>Flaggen</translation></message>
     <message><source>Kaomoji</source><translation>Kaomoji</translation></message>
   </context>
+  <context>
+    <name>emoji_palette::ui::EmojiListModel</name>
+    <message><source>%1 (no glyph in the installed emoji font)</source><translation>%1 (kein Zeichen in der installierten Emoji-Schriftart)</translation></message>
+  </context>
 </TS>

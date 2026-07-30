@@ -30,4 +30,8 @@
     <message><source>Flags</source><translation>Флаги</translation></message>
     <message><source>Kaomoji</source><translation>Каомодзи</translation></message>
   </context>
+  <context>
+    <name>emoji_palette::ui::EmojiListModel</name>
+    <message><source>%1 (no glyph in the installed emoji font)</source><translation>%1 (в установленном шрифте эмодзи нет глифа)</translation></message>
+  </context>
 </TS>

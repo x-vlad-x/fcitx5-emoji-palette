@@ -1,18 +1,22 @@
 #include "emoji_palette/catalog.hpp"
 #include "emoji_palette/geometry.hpp"
+#include "emoji_palette/glyph_coverage.hpp"
 #include "emoji_palette/keyboard.hpp"
 #include "emoji_palette/state.hpp"
 #include "emoji_palette/utf8.hpp"
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <unistd.h>
+#include <utility>
 
 namespace {
 
@@ -136,6 +140,81 @@ void testKeyboard() {
             "cancel outcome failed");
 }
 
+void testGlyphCoverage() {
+    // Mirrors google-noto-color-emoji-fonts-20250623, which still stops at Emoji 16.0.
+    const auto emoji16Font = [](std::uint32_t codepoint) {
+        static const std::array<std::pair<std::uint32_t, std::uint32_t>, 8> ranges = {{
+            {0x1F300, 0x1F321},
+            {0x1F3F3, 0x1F3FF},
+            {0x1F466, 0x1F469},
+            {0x1F600, 0x1F64F},
+            {0x1F9D1, 0x1F9DD},
+            {0x1FA8F, 0x1FAC6},
+            {0x1FADF, 0x1FAE9},
+            {0x1FAF0, 0x1FAF8},
+        }};
+        return std::any_of(ranges.begin(), ranges.end(), [codepoint](const auto& range) {
+            return codepoint >= range.first && codepoint <= range.second;
+        });
+    };
+
+    const auto covered = emoji_palette::inspectGlyphCoverage("😀", emoji16Font);
+    require(covered.renderable, "covered emoji reported as missing");
+    require(!covered.missingCodepoint, "covered emoji reported a missing code point");
+    require(emoji_palette::missingGlyphLabel(covered).empty(), "covered emoji produced a label");
+
+    const std::array<std::pair<std::string_view, std::uint32_t>, 3> reported = {
+        std::pair<std::string_view, std::uint32_t>{"🫪", 0x1FAEA},
+        std::pair<std::string_view, std::uint32_t>{"🫯", 0x1FAEF},
+        std::pair<std::string_view, std::uint32_t>{"🫈", 0x1FAC8},
+    };
+    for (const auto& [sequence, codepoint] : reported) {
+        const auto report = emoji_palette::inspectGlyphCoverage(sequence, emoji16Font);
+        require(!report.renderable, "Emoji 17.0 addition reported as renderable");
+        require(report.missingCodepoint == codepoint, "wrong missing code point reported");
+    }
+    require(emoji_palette::missingGlyphLabel(
+                emoji_palette::inspectGlyphCoverage("🫪", emoji16Font)) == "1FAEA",
+            "missing glyph label formatting failed");
+
+    // U+1FAEF is the joiner element of every wrestling sequence.
+    const auto wrestling =
+        emoji_palette::inspectGlyphCoverage("🧑🏻‍🫯‍🧑🏼", emoji16Font);
+    require(!wrestling.renderable, "uncovered ZWJ element reported as renderable");
+    require(wrestling.missingCodepoint == 0x1FAEF, "wrong ZWJ element reported as missing");
+
+    // Joiners, variation selectors and tag characters never carry a glyph of their own.
+    const auto baseOnly = [](std::uint32_t codepoint) {
+        return codepoint == 0x1F3F3 || codepoint == 0x1F308;
+    };
+    require(emoji_palette::inspectGlyphCoverage("🏳️‍🌈", baseOnly).renderable,
+            "variation selector treated as a missing glyph");
+    const auto flagOnly = [](std::uint32_t codepoint) { return codepoint == 0x1F3F4; };
+    require(
+        emoji_palette::inspectGlyphCoverage("🏴󠁧󠁢󠁥󠁮󠁧󠁿", flagOnly).renderable,
+        "tag characters treated as missing glyphs");
+
+    emoji_palette::EmojiCatalog catalog;
+    std::size_t unrenderable = 0;
+    for (const auto& record : catalog.records()) {
+        const auto report = emoji_palette::inspectGlyphCoverage(record.sequence, emoji16Font);
+        require(report.renderable != report.missingCodepoint.has_value(),
+                "inconsistent glyph coverage report");
+        if (!report.renderable) {
+            require(!emoji_palette::missingGlyphLabel(report).empty(),
+                    "unrenderable entry produced no label");
+            ++unrenderable;
+        }
+    }
+    require(unrenderable > 0, "an Emoji 16.0 font reported full Emoji 17.0 coverage");
+
+    const auto always = [](std::uint32_t) { return true; };
+    for (const auto& record : catalog.records()) {
+        require(emoji_palette::inspectGlyphCoverage(record.sequence, always).renderable,
+                "complete font coverage still reported a missing glyph");
+    }
+}
+
 void testGeometry() {
     const emoji_palette::Rect screen{-1920, 0, 1920, 1080};
     const auto lower = emoji_palette::placePopup({-100, 1000, 2, 20}, {500, 400}, screen);
@@ -159,6 +238,7 @@ int main() {
         testVariants();
         testState();
         testKeyboard();
+        testGlyphCoverage();
         testGeometry();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
