@@ -2,7 +2,7 @@
 #include "emoji_palette/ipc/protocol.hpp"
 #include "emoji_palette/ipc/session.hpp"
 #include "emoji_palette/selection_controller.hpp"
-#include "emoji_palette/utf8.hpp"
+#include "key_router.hpp"
 #include "shortcut_matcher.hpp"
 
 #include <algorithm>
@@ -211,6 +211,7 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
             return;
         }
         shortcutMatcher_.setLayout(manager.currentGroup().defaultLayout());
+        keyRouter_.setLayout(manager.currentGroup().defaultLayout());
     }
 
     void show(fcitx::InputContext& context) {
@@ -379,67 +380,21 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
         if (!controller_.active() || event.inputContext() != origin_.get()) {
             return;
         }
-        event.filter();
-        if (event.isRelease()) {
-            return;
-        }
-
-        const auto& key = event.key();
-        std::optional<CommandKind> command;
-        if (key.check(FcitxKey_Escape)) {
-            sendCommand(CommandKind::Cancel);
-            event.accept();
-            return;
-        }
-        if (key.check(FcitxKey_Return) || key.check(FcitxKey_KP_Enter) ||
-            key.check(FcitxKey_space)) {
-            command = CommandKind::Select;
-        } else if (key.check(FcitxKey_d, fcitx::KeyState::Ctrl)) {
-            command = CommandKind::ToggleFavorite;
-        } else if (key.check(FcitxKey_v, fcitx::KeyState::Ctrl)) {
-            command = CommandKind::ShowVariants;
-        } else if (key.check(FcitxKey_Left)) {
-            command = CommandKind::Left;
-        } else if (key.check(FcitxKey_Right)) {
-            command = CommandKind::Right;
-        } else if (key.check(FcitxKey_Up)) {
-            command = CommandKind::Up;
-        } else if (key.check(FcitxKey_Down)) {
-            command = CommandKind::Down;
-        } else if (key.check(FcitxKey_Home)) {
-            command = CommandKind::Home;
-        } else if (key.check(FcitxKey_End)) {
-            command = CommandKind::End;
-        } else if (key.check(FcitxKey_Page_Up)) {
-            command = CommandKind::PageUp;
-        } else if (key.check(FcitxKey_Page_Down)) {
-            command = CommandKind::PageDown;
-        } else if (key.check(FcitxKey_Tab)) {
-            command = key.states().test(fcitx::KeyState::Shift) ? CommandKind::PreviousCategory
-                                                                : CommandKind::NextCategory;
-        } else if (key.check(FcitxKey_BackSpace)) {
-            if (auto codepoints = emoji_palette::decodeUtf8(search_);
-                codepoints && !codepoints->empty()) {
-                codepoints->pop_back();
-                search_ = emoji_palette::encodeUtf8(*codepoints);
-            }
+        // Full input isolation: while the transaction is active, no key event
+        // on the source context may reach the input method or the client.
+        event.filterAndAccept();
+        const auto route =
+            keyRouter_.route(event.key(), event.origKey(), event.isRelease(), search_);
+        switch (route.action) {
+        case emoji_palette::addon::KeyRoute::Action::Ignore:
+            break;
+        case emoji_palette::addon::KeyRoute::Action::Command:
+            sendCommand(route.command);
+            break;
+        case emoji_palette::addon::KeyRoute::Action::Search:
+            search_ = route.searchText;
             sendCommand(CommandKind::SearchText, search_);
-            event.accept();
-            return;
-        } else if (key.isSimple()) {
-            const auto text = fcitx::Key::keySymToUTF8(key.sym());
-            if (!text.empty() &&
-                search_.size() + text.size() <= emoji_palette::ipc::maximumSearchSize) {
-                search_ += text;
-                sendCommand(CommandKind::SearchText, search_);
-                event.accept();
-                return;
-            }
-        }
-
-        if (command) {
-            sendCommand(*command);
-            event.accept();
+            break;
         }
     }
 
@@ -455,6 +410,7 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
     emoji_palette::EmojiCatalog catalog_;
     emoji_palette::SelectionController controller_;
     emoji_palette::addon::ShortcutMatcher shortcutMatcher_;
+    emoji_palette::addon::ActiveKeyRouter keyRouter_;
     emoji_palette::ipc::PeerSession session_;
     fcitx::TrackableObjectReference<fcitx::InputContext> origin_;
     std::uint32_t commandSequence_ = 0;

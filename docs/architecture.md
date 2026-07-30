@@ -22,7 +22,12 @@ The `emojipalette` module:
 - starts one selection transaction for the triggering input context;
 - stores the source context as
   `fcitx::TrackableObjectReference<fcitx::InputContext>`;
-- consumes keyboard events while the transaction is active;
+- consumes every keyboard event on the source context while the transaction
+  is active, presses and releases alike, so no key reaches the input method
+  or the client application;
+- translates printable keys into search text through their keysym Unicode
+  value, which works for any layout, and matches the internal favorite and
+  variant chords by physical key on non-Latin layouts;
 - forwards validated navigation and search commands to the helper;
 - commits only a validated selection received for the current transaction;
 - cancels on focus loss, reset, destruction, input-method switch, timeout,

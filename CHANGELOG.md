@@ -4,6 +4,11 @@ All notable user-visible changes are documented here.
 
 ## Unreleased
 
+- Consumed every key event on the source input context while the picker is
+  active, so search and navigation keystrokes can no longer leak into the
+  source application on any keyboard layout, and made printable search input
+  layout-aware for English, German, and Russian, including the picker chords
+  for favorites and variants on non-Latin layouts.
 - Replaced missing-glyph boxes with labelled placeholder tiles for emoji the
   installed font cannot draw, keeping the catalog complete and committing the
   exact original Unicode sequence.

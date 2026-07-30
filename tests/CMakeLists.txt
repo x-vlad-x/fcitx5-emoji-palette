@@ -60,6 +60,23 @@ if(TARGET EmojiPalette::Shortcut)
     add_test(NAME shortcut-matcher-tests COMMAND shortcut-matcher-tests)
 endif()
 
+if(TARGET EmojiPalette::Shortcut)
+    add_executable(key-router-tests key_router_tests.cpp)
+    target_link_libraries(key-router-tests PRIVATE EmojiPalette::Shortcut)
+    target_compile_features(key-router-tests PRIVATE cxx_std_20)
+    target_compile_options(
+        key-router-tests
+        PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Wconversion
+            -Wsign-conversion
+            $<$<BOOL:${EMOJI_PALETTE_WARNINGS_AS_ERRORS}>:-Werror>
+    )
+    add_test(NAME key-router-tests COMMAND key-router-tests)
+endif()
+
 add_executable(core-benchmark core_benchmark.cpp)
 target_link_libraries(core-benchmark PRIVATE EmojiPalette::Core)
 target_compile_features(core-benchmark PRIVATE cxx_std_20)

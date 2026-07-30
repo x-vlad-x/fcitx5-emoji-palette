@@ -3,7 +3,7 @@ find_package(Fcitx5ModuleDBus 5.1 REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(XkbCommon REQUIRED IMPORTED_TARGET "xkbcommon>=1.0")
 
-add_library(emoji-palette-shortcut STATIC shortcut_matcher.cpp)
+add_library(emoji-palette-shortcut STATIC key_router.cpp shortcut_matcher.cpp)
 target_compile_features(emoji-palette-shortcut PUBLIC cxx_std_20)
 target_include_directories(
     emoji-palette-shortcut
@@ -13,6 +13,7 @@ target_include_directories(
 target_link_libraries(
     emoji-palette-shortcut
     PUBLIC
+        EmojiPalette::Ipc
         Fcitx5::Core
     PRIVATE
         PkgConfig::XkbCommon
