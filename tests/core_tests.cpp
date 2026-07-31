@@ -17,6 +17,7 @@
 #include <string_view>
 #include <unistd.h>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -31,6 +32,11 @@ void testUtf8() {
     require(!emoji_palette::isValidUtf8(std::string("\xF0\x28\x8C\x28", 4)),
             "invalid UTF-8 accepted");
     require(emoji_palette::normalizeForSearch("  ÜBER-ЁЖ  ") == "über ёж", "search folding failed");
+    require(emoji_palette::normalizeForSearch("LO\u0308WE") ==
+                emoji_palette::normalizeForSearch("LÖWE"),
+            "decomposed German folding failed");
+    require(emoji_palette::normalizeForSearch("И\u0306ОГА") == "йога",
+            "decomposed Russian folding failed");
     const auto encoded = emoji_palette::hexEncode("👨‍👩‍👧");
     require(emoji_palette::hexDecode(encoded) == "👨‍👩‍👧", "hex round trip failed");
     require(!emoji_palette::hexDecode("0xz1"), "malformed hex accepted");
@@ -71,6 +77,142 @@ void testSearch() {
     const auto exact = catalog.search("🐧", emoji_palette::Locale::English, 1);
     require(exact.size() == 1 && exact.front().emoji->sequence == "🐧",
             "exact emoji search failed");
+}
+
+void testLocalizedSearch() {
+    emoji_palette::EmojiCatalog catalog;
+
+    const std::array<emoji_palette::Locale, 3> locales = {
+        emoji_palette::Locale::English,
+        emoji_palette::Locale::German,
+        emoji_palette::Locale::Russian,
+    };
+
+    const auto sequences = [&catalog](std::string_view query, emoji_palette::Locale locale,
+                                      std::size_t limit) {
+        std::vector<std::string> found;
+        for (const auto& entry : catalog.search(query, locale, limit)) {
+            found.emplace_back(entry.emoji->sequence);
+        }
+        return found;
+    };
+    const auto listed = [](const std::vector<std::string>& results, std::string_view sequence) {
+        return std::find(results.begin(), results.end(), sequence) != results.end();
+    };
+
+    struct LocalizedCase {
+        std::string_view query;
+        std::string_view sequence;
+    };
+    const std::array<LocalizedCase, 9> criteria = {{
+        {"heart", "❤️"},
+        {"Herz", "❤️"},
+        {"сердце", "❤️"},
+        {"cat", "🐈"},
+        {"Katze", "🐈"},
+        {"кот", "🐈"},
+        {"fire", "🔥"},
+        {"Feuer", "🔥"},
+        {"огонь", "🔥"},
+    }};
+    for (const auto locale : locales) {
+        for (const auto& entry : criteria) {
+            require(listed(sequences(entry.query, locale, 50), entry.sequence),
+                    "localized query " + std::string(entry.query) + " found no match");
+        }
+    }
+
+    // Localized keywords, not only localized names, are searchable everywhere.
+    require(listed(sequences("Flamme", emoji_palette::Locale::Russian, 20), "🔥"),
+            "German keyword was not searchable under a Russian locale");
+    require(listed(sequences("костер", emoji_palette::Locale::German, 20), "🔥"),
+            "Russian keyword was not searchable under a German locale");
+    require(listed(sequences("litaf", emoji_palette::Locale::German, 20), "🔥"),
+            "English keyword was not searchable under a German locale");
+
+    // An exact localized name still ranks first for a foreign requested locale.
+    const auto katze = sequences("Katze", emoji_palette::Locale::English, 10);
+    require(!katze.empty() && katze.front() == "🐈", "German name ranking failed");
+    const auto fire = sequences("огонь", emoji_palette::Locale::English, 10);
+    require(!fire.empty() && fire.front() == "🔥", "Russian name ranking failed");
+    const auto feuer = sequences("Feuer", emoji_palette::Locale::Russian, 10);
+    require(!feuer.empty() && feuer.front() == "🔥", "German name ranking failed");
+
+    // Case folding and normalization are independent of the requested locale.
+    const auto identical = [&sequences](std::string_view left, std::string_view right,
+                                        emoji_palette::Locale locale) {
+        const auto folded = sequences(left, locale, 20);
+        return !folded.empty() && folded == sequences(right, locale, 20);
+    };
+    require(identical("HERZ", "herz", emoji_palette::Locale::English),
+            "German case folding failed");
+    require(identical("СЕРДЦЕ", "сердце", emoji_palette::Locale::English),
+            "Russian case folding failed");
+    require(identical("FIRE", "fire", emoji_palette::Locale::Russian),
+            "English case folding failed");
+    require(identical("LÖWE", "löwe", emoji_palette::Locale::Russian),
+            "German umlaut case folding failed");
+    require(identical("lo\u0308we", "löwe", emoji_palette::Locale::English),
+            "decomposed German query was not normalized");
+    require(identical("воздушныи\u0306", "воздушный", emoji_palette::Locale::German),
+            "decomposed Russian query was not normalized");
+
+    // A missing localized annotation falls back instead of blocking a match.
+    const std::array<emoji_palette::LocalizedAnnotation, emoji_palette::localeCount> partial = {{
+        {"red heart", {"emotion", "heart"}},
+        {"", {}},
+        {"", {""}},
+    }};
+    const auto sparse = emoji_palette::buildSearchDocument(partial);
+    const auto heartToken = emoji_palette::normalizeForSearch("heart");
+    const auto herzToken = emoji_palette::normalizeForSearch("herz");
+    for (const auto locale : locales) {
+        require(emoji_palette::scoreSearchToken(heartToken, sparse, locale) >= 0,
+                "a missing localized annotation blocked the English fallback");
+        require(emoji_palette::scoreSearchToken(herzToken, sparse, locale) < 0,
+                "an empty localized annotation produced a match");
+    }
+
+    // The requested locale ranks matches; it never hides them.
+    const std::array<emoji_palette::LocalizedAnnotation, emoji_palette::localeCount> complete = {{
+        {"red heart", {"emotion", "heart", "love", "red"}},
+        {"rotes Herz", {"Herz", "rotes Herz"}},
+        {"алое сердце", {"красное", "любовь", "сердце"}},
+    }};
+    const auto document = emoji_palette::buildSearchDocument(complete);
+    const auto serdceToken = emoji_palette::normalizeForSearch("сердце");
+    require(
+        emoji_palette::scoreSearchToken(herzToken, document, emoji_palette::Locale::German) >
+            emoji_palette::scoreSearchToken(herzToken, document, emoji_palette::Locale::English),
+        "the requested locale did not rank ahead of a foreign locale");
+    for (const auto locale : locales) {
+        require(emoji_palette::scoreSearchToken(serdceToken, document, locale) >= 0,
+                "a Russian token did not match under every locale");
+        require(emoji_palette::scoreSearchToken(emoji_palette::normalizeForSearch("umbrella"),
+                                                document, locale) < 0,
+                "an unrelated token matched");
+    }
+
+    // Index construction and ranking are deterministic and need no network access.
+    const auto repeated = emoji_palette::buildSearchDocument(complete);
+    for (std::size_t locale = 0; locale < emoji_palette::localeCount; ++locale) {
+        require(repeated.locales[locale].name == document.locales[locale].name &&
+                    repeated.locales[locale].keywords == document.locales[locale].keywords,
+                "search index construction is not deterministic");
+    }
+    const emoji_palette::EmojiCatalog rebuilt;
+    for (const auto locale : locales) {
+        for (const auto& entry : criteria) {
+            const auto original = catalog.search(entry.query, locale, 50);
+            const auto again = rebuilt.search(entry.query, locale, 50);
+            require(original.size() == again.size(), "search results are not reproducible");
+            for (std::size_t index = 0; index < original.size(); ++index) {
+                require(original[index].emoji->sequence == again[index].emoji->sequence &&
+                            original[index].score == again[index].score,
+                        "search ranking is not reproducible");
+            }
+        }
+    }
 }
 
 void testVariants() {
@@ -235,6 +377,7 @@ int main() {
         testUtf8();
         testCatalog();
         testSearch();
+        testLocalizedSearch();
         testVariants();
         testState();
         testKeyboard();

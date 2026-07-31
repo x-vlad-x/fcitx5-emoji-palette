@@ -68,6 +68,12 @@ Pinned Unicode Emoji and CLDR inputs are converted into deterministic generated
 data committed to the repository. Search indexes are built once at startup and
 shared by category and query models.
 
+Every bundled language is indexed for every emoji, and a query is scored
+against all of them. The locale the addon reports only ranks matches and
+selects the displayed annotation; it never restricts which language can be
+typed. Query and index text pass through the same case folding and combining
+mark composition, so the comparison is language independent.
+
 User configuration, favorites, and recents live below the XDG config and state
 directories. Writes use `QSaveFile` or an equivalent same-directory
 write-and-rename implementation. Invalid files are quarantined or ignored and

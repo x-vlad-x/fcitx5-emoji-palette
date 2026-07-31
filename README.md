@@ -13,7 +13,9 @@ desktop manual test matrix has not been executed.
 ## Features
 
 - Search across 3,944 fully-qualified Unicode Emoji 17.0 sequences.
-- English, German, and Russian CLDR 48.2 names and keywords.
+- English, German, and Russian CLDR 48.2 names and keywords, all searched
+  at once so a query in any of the three languages works regardless of the
+  desktop language and the active keyboard layout.
 - Categories, recent selections, favorites, and skin-tone variants.
 - Keyboard navigation while focus remains in the source application.
 - Native `InputContext::commitString()` insertion through Fcitx 5.
