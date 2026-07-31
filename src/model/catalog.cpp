@@ -67,22 +67,53 @@ int textScore(std::string_view token, std::string_view text, int exact) {
     return -1;
 }
 
-template <typename Document>
-int documentScore(std::string_view token, const Document& document, std::size_t locale) {
-    int best = textScore(token, document.names[locale], 1000);
-    for (const auto& keyword : document.keywords[locale]) {
-        best = std::max(best, textScore(token, keyword, 700));
+struct AnnotationWeights {
+    int name;
+    int keyword;
+};
+
+// The requested locale scores highest, English follows as the language every
+// annotation set is derived from, and the remaining bundled languages form a
+// third band. That band is deliberately low enough that an exact foreign name
+// never outranks a substring match in the requested language, and low enough
+// that the fuzzy subsequence rule of textScore() cannot apply to it at all.
+AnnotationWeights weightsFor(std::size_t locale, std::size_t requested) {
+    if (locale == requested) {
+        return {1000, 700};
     }
-    if (locale != 0) {
-        int fallback = textScore(token, document.names[0], 900);
-        for (const auto& keyword : document.keywords[0]) {
-            fallback = std::max(fallback, textScore(token, keyword, 600));
-        }
-        best = std::max(best, fallback);
+    if (locale == static_cast<std::size_t>(Locale::English)) {
+        return {900, 600};
     }
-    return best;
+    return {600, 400};
 }
 
+}
+
+SearchDocument
+buildSearchDocument(const std::array<LocalizedAnnotation, localeCount>& annotations) {
+    SearchDocument document;
+    for (std::size_t locale = 0; locale < localeCount; ++locale) {
+        document.locales[locale].name = normalizeForSearch(annotations[locale].name);
+        document.locales[locale].keywords.reserve(annotations[locale].keywords.size());
+        for (const auto& keyword : annotations[locale].keywords) {
+            document.locales[locale].keywords.push_back(normalizeForSearch(keyword));
+        }
+    }
+    return document;
+}
+
+int scoreSearchToken(std::string_view token, const SearchDocument& document, Locale requested) {
+    const auto requestedIndex = static_cast<std::size_t>(requested);
+    int best = -1;
+    for (std::size_t locale = 0; locale < localeCount; ++locale) {
+        const auto weights = weightsFor(locale, requestedIndex);
+        const auto& annotation = document.locales[locale];
+        best = std::max(best, textScore(token, annotation.name, weights.name));
+        for (const auto& keyword : annotation.keywords) {
+            best = std::max(best, textScore(token, keyword, weights.keyword));
+        }
+    }
+    return best < 0 ? -1 : best;
 }
 
 EmojiCatalog::EmojiCatalog() {
@@ -111,16 +142,8 @@ EmojiCatalog::EmojiCatalog() {
                 },
             .baseSequence = std::string(generated.baseSequence),
         };
-        SearchDocument document;
-        for (std::size_t locale = 0; locale < record.annotations.size(); ++locale) {
-            document.names[locale] = normalizeForSearch(record.annotations[locale].name);
-            document.keywords[locale].reserve(record.annotations[locale].keywords.size());
-            for (const auto& keyword : record.annotations[locale].keywords) {
-                document.keywords[locale].push_back(normalizeForSearch(keyword));
-            }
-        }
+        searchDocuments_.push_back(buildSearchDocument(record.annotations));
         records_.push_back(std::move(record));
-        searchDocuments_.push_back(std::move(document));
     }
 }
 
@@ -161,7 +184,6 @@ std::vector<SearchResult> EmojiCatalog::search(std::string_view query, Locale lo
     if (tokens.empty()) {
         return {};
     }
-    const auto localeIndex = static_cast<std::size_t>(locale);
     struct Candidate {
         std::size_t index;
         int score;
@@ -171,7 +193,7 @@ std::vector<SearchResult> EmojiCatalog::search(std::string_view query, Locale lo
         int total = 0;
         bool matches = true;
         for (const auto& token : tokens) {
-            const int score = documentScore(token, searchDocuments_[index], localeIndex);
+            const int score = scoreSearchToken(token, searchDocuments_[index], locale);
             if (score < 0) {
                 matches = false;
                 break;

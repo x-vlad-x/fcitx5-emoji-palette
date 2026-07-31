@@ -4,6 +4,11 @@ All notable user-visible changes are documented here.
 
 ## Unreleased
 
+- Searched the bundled English, German, and Russian CLDR annotations at the
+  same time, so German and Russian queries such as `Herz`, `Katze`, `Feuer`,
+  `сердце`, `кот`, and `огонь` now find emoji without changing the desktop
+  language, and folded decomposed umlauts and Cyrillic breve sequences into
+  their precomposed form before comparing.
 - Consumed every key event on the source input context while the picker is
   active, so search and navigation keystrokes can no longer leak into the
   source application on any keyboard layout, and made printable search input

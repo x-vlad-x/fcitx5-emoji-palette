@@ -38,6 +38,30 @@ std::uint32_t foldCodepoint(std::uint32_t value) {
     }
 }
 
+// The bundled CLDR annotations are NFC, so a decomposed query would otherwise
+// never match. Only the combining marks that occur in German and Russian text
+// are composed; anything else is left untouched.
+std::uint32_t composeWithMark(std::uint32_t base, std::uint32_t mark) {
+    if (mark == 0x0308) {
+        switch (base) {
+        case 'a':
+            return 0x00E4;
+        case 'o':
+            return 0x00F6;
+        case 'u':
+            return 0x00FC;
+        case 0x0435:
+            return 0x0451;
+        default:
+            return 0;
+        }
+    }
+    if (mark == 0x0306 && base == 0x0438) {
+        return 0x0439;
+    }
+    return 0;
+}
+
 int hexValue(char value) {
     if (value >= '0' && value <= '9') {
         return value - '0';
@@ -135,6 +159,13 @@ std::string normalizeForSearch(std::string_view value) {
     bool previousSpace = true;
     for (const auto original : *decoded) {
         auto codepoint = foldCodepoint(original);
+        if (!previousSpace && !normalized.empty()) {
+            if (const auto composed = composeWithMark(normalized.back(), codepoint);
+                composed != 0) {
+                normalized.back() = composed;
+                continue;
+            }
+        }
         const bool isSpace =
             codepoint == ' ' || codepoint == '\t' || codepoint == '\n' || codepoint == '\r';
         if (isSpace) {

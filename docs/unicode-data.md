@@ -8,6 +8,18 @@ English, German, and Russian names and keywords come from CLDR 48.2 annotations
 and derived annotations. Isolated emoji components are excluded from the
 palette. Fully-qualified ZWJ sequences and variation selectors remain intact.
 
+## Search
+
+All three annotation sets are indexed for every entry and every query is scored
+against all of them. The requested locale only orders the results: a match in
+that language outranks English, which outranks the remaining language. An entry
+without a localized annotation simply contributes no match for that language.
+
+Index and query text are folded to lower case and the combining marks that
+occur in the bundled languages are composed, so a decomposed query matches the
+precomposed generated data. The index is built from the committed file at
+startup, which keeps search deterministic and offline.
+
 ## Font coverage
 
 The supported catalog version is a property of this repository, not of the

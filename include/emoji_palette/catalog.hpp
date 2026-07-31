@@ -29,6 +29,8 @@ enum class Locale {
     Russian = 2,
 };
 
+inline constexpr std::size_t localeCount = 3;
+
 struct LocalizedAnnotation {
     std::string name;
     std::vector<std::string> keywords;
@@ -38,7 +40,7 @@ struct EmojiRecord {
     std::string sequence;
     Category category;
     std::string subgroup;
-    std::array<LocalizedAnnotation, 3> annotations;
+    std::array<LocalizedAnnotation, localeCount> annotations;
     std::string baseSequence;
 };
 
@@ -46,6 +48,24 @@ struct SearchResult {
     const EmojiRecord* emoji;
     int score;
 };
+
+struct AnnotationIndex {
+    std::string name;
+    std::vector<std::string> keywords;
+};
+
+// Every bundled locale is indexed for every emoji, so a query is never limited
+// to the language the picker was opened with.
+struct SearchDocument {
+    std::array<AnnotationIndex, localeCount> locales;
+};
+
+SearchDocument buildSearchDocument(const std::array<LocalizedAnnotation, localeCount>& annotations);
+
+// Scores an already normalized token against every bundled locale and returns a
+// negative value when none of them matches. The requested locale only ranks
+// matches ahead of the other languages; it never hides them.
+int scoreSearchToken(std::string_view token, const SearchDocument& document, Locale requested);
 
 class EmojiCatalog {
   public:
@@ -59,11 +79,6 @@ class EmojiCatalog {
                                      std::size_t limit = 100) const;
 
   private:
-    struct SearchDocument {
-        std::array<std::string, 3> names;
-        std::array<std::vector<std::string>, 3> keywords;
-    };
-
     std::vector<EmojiRecord> records_;
     std::vector<SearchDocument> searchDocuments_;
 };

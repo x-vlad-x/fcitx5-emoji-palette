@@ -1,6 +1,6 @@
 %global upstream_version 0.1.0
 %global prerelease_version rc.2
-%global base_release 6
+%global base_release 7
 
 Name:           fcitx5-emoji-palette
 Version:        0.1.0~rc2
@@ -71,6 +71,9 @@ appstream-util validate-relax --nonet \
 %{_metainfodir}/org.fcitx.Fcitx5.EmojiPalette.metainfo.xml
 
 %changelog
+* Fri Jul 31 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-7
+- Search the bundled English, German, and Russian annotations simultaneously
+
 * Thu Jul 30 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-6
 - Consume every key event while the picker is active and translate printable
   search keys on any keyboard layout
