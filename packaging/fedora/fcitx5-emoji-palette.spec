@@ -1,6 +1,6 @@
 %global upstream_version 0.1.0
 %global prerelease_version rc.2
-%global base_release 5
+%global base_release 6
 
 Name:           fcitx5-emoji-palette
 Version:        0.1.0~rc2
@@ -71,6 +71,10 @@ appstream-util validate-relax --nonet \
 %{_metainfodir}/org.fcitx.Fcitx5.EmojiPalette.metainfo.xml
 
 %changelog
+* Thu Jul 30 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-6
+- Consume every key event while the picker is active and translate printable
+  search keys on any keyboard layout
+
 * Wed Jul 29 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-5
 - Resolve the packaging test target from the spec instead of a fixed release
 
