@@ -7,9 +7,11 @@
 #include "emoji_palette/keyboard.hpp"
 #include "emoji_palette/state.hpp"
 
+#include <QHash>
 #include <QSettings>
 #include <QWidget>
 
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <vector>
@@ -19,6 +21,7 @@ class QFrame;
 class QLabel;
 class QListView;
 class QModelIndex;
+class QScreen;
 class QToolButton;
 
 namespace emoji_palette::ui {
@@ -58,6 +61,8 @@ class PaletteWindow final : public QWidget {
     void showCurrentVariants();
     void chooseSequence(std::string_view sequence);
     void positionFor(const ipc::Show& request);
+    void rememberOutputScale();
+    std::uint16_t knownOutputScale(const QScreen& screen) const;
     void applyCellSize(int size);
     void saveState();
     QString categoryLabel(Category category) const;
@@ -81,6 +86,7 @@ class PaletteWindow final : public QWidget {
     QToolButton* settingsButton_ = nullptr;
     QToolButton* favoriteButton_ = nullptr;
     QToolButton* variantsButton_ = nullptr;
+    QHash<QString, std::uint16_t> outputScales_;
     int cellSize_ = 52;
     int columns_ = 9;
     int rows_ = 7;

@@ -1,6 +1,6 @@
 %global upstream_version 0.1.0
 %global prerelease_version rc.2
-%global base_release 6
+%global base_release 15
 
 Name:           fcitx5-emoji-palette
 Version:        0.1.0~rc2
@@ -71,6 +71,10 @@ appstream-util validate-relax --nonet \
 %{_metainfodir}/org.fcitx.Fcitx5.EmojiPalette.metainfo.xml
 
 %changelog
+* Sun Aug 02 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-15
+- Place the picker next to the text caret and center it on the active
+  output when the frontend reports no cursor position
+
 * Thu Jul 30 2026 Vladislav Shadiuk <x-vlad-x@users.noreply.github.com> - 0.1.0~rc2-6
 - Consume every key event while the picker is active and translate printable
   search keys on any keyboard layout

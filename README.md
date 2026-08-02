@@ -19,8 +19,9 @@ desktop manual test matrix has not been executed.
 - Native `InputContext::commitString()` insertion through Fcitx 5.
 - Clipboard-independent operation with no synthetic input.
 - Non-activating LayerShellQt palette on Wayland.
-- Active-screen placement with caret-relative positioning when geometry is
-  available.
+- Caret-relative placement on every Fcitx5 frontend that reports a cursor
+  position, with a documented active-output fallback where none exists
+  (see *Picker placement*).
 - Bounded, versioned, replay-resistant D-Bus protocol between the addon and
   the crash-isolated Qt helper.
 - Atomic user-state writes and recovery from a damaged state file.
@@ -122,6 +123,66 @@ focusable popup. The first `Escape` press or pointer press elsewhere inside the
 picker closes only those controls. Clicking another application follows the
 normal source-focus rule and cancels the picker if the original input context
 loses focus.
+
+## Picker placement
+
+The picker opens next to the text caret whenever the Fcitx 5 frontend serving
+the focused application reports a cursor position. It opens below the caret,
+above it when there is no room below, on the monitor that holds the caret, and
+always inside the usable area of that monitor. The client scale factor is
+applied, so placement is correct at 125%, 150% and other fractional scaling
+factors.
+
+On an output using a fractional scale such as 125% or 150%, the first
+activation of the palette on that output uses the centered fallback. Wayland
+reports an output's fractional scale to a client only after one of its windows
+has appeared there, and the picker places itself at the caret rather than at an
+estimate. Every later activation on that output is caret-relative.
+
+Native Wayland applications do not provide a caret position. The Wayland
+input-method protocols deliberately withhold global caret coordinates from the
+input method, and the only protocol that solves this,
+`zwp_input_popup_surface_v2`, can be used only by the process that owns the
+Wayland input-method connection, which is Fcitx 5 itself rather than this
+crash-isolated helper. For those applications the picker is centered on the
+active monitor. This is the documented fallback and is not a misconfiguration.
+
+Caret-relative placement is therefore active for X11 and XWayland applications,
+including applications configured with the Fcitx 5 Qt or GTK input-method
+modules (`QT_IM_MODULE=fcitx`, `GTK_IM_MODULE=fcitx`) under XWayland, and for
+any other frontend that reports an absolute cursor rectangle. Those input-method
+modules report a window-relative rectangle when the application itself runs on
+Wayland, which no separate process can resolve, so those applications receive
+the centered fallback as well.
+
+To see which path an application takes, enable the addon's diagnostic log
+category. Fcitx 5 log levels are numeric and `5` is debug:
+
+```bash
+busctl --user call org.fcitx.Fcitx5 /controller \
+  org.fcitx.Fcitx.Controller1 SetLogRule s 'emojipalette=5'
+```
+
+The same rule can be passed at startup with `fcitx5 --verbose 'emojipalette=5'`.
+Each activation then logs the frontend name, the raw cursor rectangle, the
+scale factor, and whether the caret was usable:
+
+```text
+Show frontend=wayland rawCaret=0,0,0,0 relativeRect=0 clientScalePercent=100 caretUsable=0
+Show frontend=dbus rawCaret=782,302,2,26 relativeRect=0 clientScalePercent=100 caretUsable=1
+```
+
+The helper logs the placement it derived under
+`org.fcitx.EmojiPalette.placement`, which reports the converted caret, the
+chosen output, and the final position:
+
+```bash
+QT_LOGGING_RULES='org.fcitx.EmojiPalette.placement=true' \
+  /usr/libexec/fcitx5-emoji-palette-ui
+```
+
+Search text and selected emoji are never logged. See
+`docs/adr/0006-caret-relative-placement.md` for the full rationale.
 
 ## Privacy and security model
 

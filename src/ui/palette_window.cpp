@@ -12,6 +12,7 @@
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLayout>
 #include <QListView>
 #include <QLoggingCategory>
 #include <QPainter>
@@ -29,14 +30,20 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
+#include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace emoji_palette::ui {
 
 namespace {
 
 Q_LOGGING_CATEGORY(logState, "org.fcitx.EmojiPalette.state")
+
+// Geometry only. Search text and selected sequences are never logged.
+Q_LOGGING_CATEGORY(logPlacement, "org.fcitx.EmojiPalette.placement")
 
 QString fromUtf8(std::string_view value) {
     return QString::fromUtf8(value.data(), static_cast<qsizetype>(value.size()));
@@ -185,6 +192,7 @@ void PaletteWindow::showPalette(const ipc::Show& request) {
 }
 
 void PaletteWindow::hidePalette() {
+    rememberOutputScale();
     setSettingsPanelVisible(false);
     hide();
     variantsPanel_->hide();
@@ -274,6 +282,10 @@ void PaletteWindow::setGlyphProbe(GlyphProbe probe) {
 
 void PaletteWindow::changeEvent(QEvent* event) {
     QWidget::changeEvent(event);
+    if (event->type() == QEvent::DevicePixelRatioChange) {
+        rememberOutputScale();
+        return;
+    }
     if (event->type() != QEvent::FontChange) {
         return;
     }
@@ -568,26 +580,117 @@ void PaletteWindow::chooseSequence(std::string_view sequence) {
     }
 }
 
+namespace {
+
+std::uint16_t scalePercentOf(double ratio) {
+    const auto percent = static_cast<int>(std::lround(ratio * 100.0));
+    return static_cast<std::uint16_t>(std::clamp(percent, static_cast<int>(minimumScalePercent),
+                                                 static_cast<int>(maximumScalePercent)));
+}
+
+}
+
+void PaletteWindow::rememberOutputScale() {
+    // Only a mapped surface carries the real fractional scale; before that the
+    // window still reports the output's integer buffer scale.
+    const auto* handle = windowHandle();
+    if (handle == nullptr || !handle->isExposed() || handle->screen() == nullptr) {
+        return;
+    }
+    outputScales_.insert(handle->screen()->name(), scalePercentOf(handle->devicePixelRatio()));
+}
+
+std::uint16_t PaletteWindow::knownOutputScale(const QScreen& screen) const {
+    // Qt reports the integer buffer scale of a Wayland output; its fractional
+    // scale only arrives once a surface of ours has been mapped on it. A
+    // reported ratio of exactly one needs no surface, because no larger
+    // fractional scale rounds down to it.
+    if (scalePercentOf(screen.devicePixelRatio()) == 100) {
+        return 100;
+    }
+    return outputScales_.value(screen.name(), 0);
+}
+
 void PaletteWindow::positionFor(const ipc::Show& request) {
-    const bool hasCaret = request.caret.x != 0 || request.caret.y != 0 || request.caret.width > 0 ||
-                          request.caret.height > 0;
-    QScreen* screen = hasCaret ? QGuiApplication::screenAt({request.caret.x, request.caret.y})
-                               : QGuiApplication::screenAt(QCursor::pos());
+    rememberOutputScale();
+    // The layout only imposes its minimum size when it runs, which otherwise
+    // happens on show, after this placement. Run it now so the size used here
+    // is the size the palette will actually have.
+    ensurePolished();
+    if (auto* contents = layout()) {
+        contents->activate();
+    }
+    const auto screens = QGuiApplication::screens();
+    if (screens.isEmpty()) {
+        return;
+    }
+
+    // Fcitx5 reports an absolute caret in device pixels, so the output is
+    // resolved in that same space before anything is converted.
+    std::vector<Rect> nativeOutputs;
+    nativeOutputs.reserve(static_cast<std::size_t>(screens.size()));
+    for (const auto* candidate : screens) {
+        const QRect logical = candidate->geometry();
+        const auto known = knownOutputScale(*candidate);
+        nativeOutputs.push_back(
+            nativeOutputBounds({logical.x(), logical.y(), logical.width(), logical.height()},
+                               known != 0 ? known : scalePercentOf(candidate->devicePixelRatio())));
+    }
+
+    const bool hasCaret = request.caret != absentCaret && isTransportableRect(request.caret);
+    QScreen* screen = nullptr;
+    if (hasCaret) {
+        if (const auto index = outputForCaret(request.caret, nativeOutputs)) {
+            screen = screens.at(static_cast<qsizetype>(*index));
+        }
+    }
+    if (screen == nullptr) {
+        // No caret rectangle, or no usable output near it. On Wayland the
+        // compositor picks the active output below; the pointer position is
+        // only meaningful on X11.
+        screen = QGuiApplication::screenAt(QCursor::pos());
+    }
     if (screen == nullptr) {
         screen = QGuiApplication::primaryScreen();
     }
     if (screen == nullptr) {
         return;
     }
+
+    const QRect geometry = screen->geometry();
     const QRect available = screen->availableGeometry();
-    const Size popup{std::min(width(), available.width()), std::min(height(), available.height())};
-    resize(popup.width, popup.height);
-    const Rect caret =
-        hasCaret
-            ? Rect{request.caret.x, request.caret.y, request.caret.width, request.caret.height}
-            : Rect{available.x() + (available.width() - popup.width) / 2, available.y() + 24, 0, 0};
+    // Resize first: a layout minimum can keep the widget larger than the
+    // requested size, and placement has to use the size Qt actually applied.
+    resize(std::min(width(), available.width()), std::min(height(), available.height()));
+    const Size popup{width(), height()};
     const Rect bounds{available.x(), available.y(), available.width(), available.height()};
-    const auto placement = placePopup(caret, popup, bounds);
+    // Converting with a scale that is only an upper bound would put the picker
+    // somewhere it does not belong, so the documented fallback is used until
+    // this output's real scale is known.
+    const auto outputScale = knownOutputScale(*screen);
+    std::optional<Rect> caret;
+    if (hasCaret && outputScale != 0) {
+        caret = logicalFromNative(request.caret,
+                                  {geometry.x(), geometry.y(), geometry.width(), geometry.height()},
+                                  outputScale);
+    }
+    const Point position =
+        caret ? placePopup(*caret, popup, bounds).position : centeredPopup(popup, bounds);
+
+    qCDebug(logPlacement).nospace()
+        << "platform=" << QGuiApplication::platformName() << " rawCaret=" << request.caret.x << ","
+        << request.caret.y << "," << request.caret.width << "," << request.caret.height
+        << " clientScalePercent=" << request.scalePercent << " output=" << screen->name()
+        << " outputScalePercent=" << outputScale << " geometry=" << geometry
+        << " available=" << available << " logicalCaret="
+        << (caret ? QStringLiteral("%1,%2,%3,%4")
+                        .arg(caret->x)
+                        .arg(caret->y)
+                        .arg(caret->width)
+                        .arg(caret->height)
+                  : QStringLiteral("absent"))
+        << " popup=" << popup.width << "x" << popup.height << " position=" << position.x << ","
+        << position.y;
 
     winId();
     if (QGuiApplication::platformName().startsWith(QStringLiteral("wayland"))) {
@@ -596,24 +699,25 @@ void PaletteWindow::positionFor(const ipc::Show& request) {
             layer->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityNone);
             layer->setActivateOnShow(false);
             layer->setExclusiveZone(0);
-            layer->setAnchors(hasCaret
-                                  ? LayerShellQt::Window::Anchors{LayerShellQt::Window::AnchorTop} |
-                                        LayerShellQt::Window::AnchorLeft
-                                  : LayerShellQt::Window::Anchors{LayerShellQt::Window::AnchorTop});
-            if (hasCaret) {
+            layer->setScope(QStringLiteral("fcitx5-emoji-palette"));
+            layer->setDesiredSize(size());
+            if (caret) {
+                layer->setAnchors(LayerShellQt::Window::Anchors{LayerShellQt::Window::AnchorTop} |
+                                  LayerShellQt::Window::AnchorLeft);
                 layer->setScreen(screen);
+                // Layer-shell margins are measured from the anchored edges of
+                // the output itself, not from the panel-adjusted area.
+                layer->setMargins({position.x - geometry.x(), position.y - geometry.y(), 0, 0});
             } else {
+                // An unanchored layer surface is centered by the compositor on
+                // the output it is assigned to.
+                layer->setAnchors(LayerShellQt::Window::Anchors{});
+                layer->setMargins({});
                 layer->setWantsToBeOnActiveScreen(true);
             }
-            layer->setDesiredSize(size());
-            layer->setMargins(hasCaret
-                                  ? QMargins{placement.position.x - screen->geometry().x(),
-                                             placement.position.y - screen->geometry().y(), 0, 0}
-                                  : QMargins{0, 24, 0, 0});
-            layer->setScope(QStringLiteral("fcitx5-emoji-palette"));
         }
     } else {
-        move(placement.position.x, placement.position.y);
+        move(position.x, position.y);
     }
 }
 

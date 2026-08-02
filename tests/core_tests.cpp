@@ -7,11 +7,14 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <set>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -228,6 +231,126 @@ void testGeometry() {
             "oversized popup clamp failed");
 }
 
+void testCaretConversion() {
+    using emoji_palette::absentCaret;
+    using emoji_palette::logicalFromNative;
+    using emoji_palette::nativeOutputBounds;
+    using emoji_palette::Rect;
+    using emoji_palette::sanitizedCaret;
+
+    // A single output at the origin: native pixels are logical pixels times
+    // the output scale.
+    const Rect primary{0, 0, 1280, 720};
+    require(nativeOutputBounds(primary, 100) == Rect{0, 0, 1280, 720},
+            "unscaled output bounds changed");
+    require(nativeOutputBounds(primary, 125) == Rect{0, 0, 1600, 900},
+            "125 percent output bounds failed");
+    require(nativeOutputBounds(primary, 150) == Rect{0, 0, 1920, 1080},
+            "150 percent output bounds failed");
+    require(nativeOutputBounds(primary, 200) == Rect{0, 0, 2560, 1440},
+            "200 percent output bounds failed");
+
+    require(logicalFromNative({100, 200, 2, 20}, primary, 100) == Rect{100, 200, 2, 20},
+            "unscaled conversion changed the rectangle");
+    require(logicalFromNative({125, 250, 3, 25}, primary, 125) == Rect{100, 200, 2, 20},
+            "125 percent conversion failed");
+    require(logicalFromNative({150, 300, 3, 30}, primary, 150) == Rect{100, 200, 2, 20},
+            "150 percent conversion failed");
+    require(logicalFromNative({200, 400, 4, 40}, primary, 200) == Rect{100, 200, 2, 20},
+            "200 percent conversion failed");
+    require(logicalFromNative({151, 0, 0, 0}, primary, 150) == Rect{101, 0, 0, 0},
+            "conversion did not round to the nearest logical pixel");
+
+    // Qt keeps an output origin in logical pixels and counts its native pixels
+    // from that same origin, so a secondary output left of the primary one
+    // must not be shifted by its own scale.
+    const Rect secondary{-1280, 0, 1280, 720};
+    require(nativeOutputBounds(secondary, 150) == Rect{-1280, 0, 1920, 1080},
+            "negative-origin output bounds failed");
+    require(logicalFromNative({-1280, 300, 3, 30}, secondary, 150) == Rect{-1280, 200, 2, 20},
+            "negative-origin conversion failed");
+    require(logicalFromNative({-380, 300, 3, 30}, secondary, 150) == Rect{-680, 200, 2, 20},
+            "negative-origin offset conversion failed");
+
+    require(sanitizedCaret({10, 20, 2, 20}) == Rect{10, 20, 2, 20},
+            "a valid caret rectangle was altered");
+    // A frontend that reports an unknown extent as a zero bottom-right corner
+    // yields negative dimensions the wire format would reject.
+    require(sanitizedCaret({10, 20, -10, -20}) == Rect{10, 20, 0, 0},
+            "negative caret dimensions were not clamped");
+    require(sanitizedCaret({emoji_palette::coordinateLimit + 1, 0, 2, 20}) == absentCaret,
+            "an out-of-range caret rectangle was not rejected");
+    require(sanitizedCaret({0, 0, 0, 0}) == absentCaret, "the absent sentinel was not preserved");
+}
+
+void testOutputSelection() {
+    using emoji_palette::outputForCaret;
+    using emoji_palette::Rect;
+
+    // Native-pixel bounds of three outputs, as nativeOutputBounds produces.
+    const std::array<Rect, 3> outputs{Rect{-1920, 0, 1920, 1080}, Rect{0, 0, 2560, 1440},
+                                      Rect{2560, 200, 1920, 1080}};
+    const std::span<const Rect> view{outputs};
+
+    require(outputForCaret({-100, 500, 2, 20}, view) == std::size_t{0},
+            "a caret on the negative-origin output selected another output");
+    require(outputForCaret({10, 10, 2, 20}, view) == std::size_t{1},
+            "a caret on the primary output selected another output");
+    require(outputForCaret({3000, 400, 2, 20}, view) == std::size_t{2},
+            "a caret on the right-hand output selected another output");
+    // A caret above the right-hand output lies in no output at all.
+    require(outputForCaret({3000, 0, 2, 20}, view) == std::size_t{2},
+            "a caret in a gap did not select the nearest output");
+    require(outputForCaret({9000, 9000, 2, 20}, view) == std::size_t{2},
+            "a caret beyond every output did not select the nearest output");
+    require(outputForCaret({-9000, 500, 2, 20}, view) == std::size_t{0},
+            "a caret left of every output did not select the nearest output");
+
+    const std::array<Rect, 2> empty{Rect{0, 0, 0, 0}, Rect{0, 0, 1920, 1080}};
+    require(outputForCaret({10, 10, 2, 20}, std::span<const Rect>{empty}) == std::size_t{1},
+            "an empty output was selected");
+    require(!outputForCaret({10, 10, 2, 20}, std::span<const Rect>{}).has_value(),
+            "an output was selected from an empty list");
+}
+
+void testPopupEdges() {
+    using emoji_palette::centeredPopup;
+    using emoji_palette::placePopup;
+    using emoji_palette::Point;
+    using emoji_palette::Rect;
+    using emoji_palette::Size;
+
+    const Rect screen{0, 0, 1920, 1080};
+    const Size popup{500, 400};
+
+    require(placePopup({0, 0, 2, 20}, popup, screen) ==
+                emoji_palette::PopupPlacement{{0, 20}, true},
+            "top-left corner placement failed");
+    require(placePopup({1919, 0, 2, 20}, popup, screen).position == Point{1420, 20},
+            "top-right corner placement failed");
+    require(placePopup({0, 1079, 2, 20}, popup, screen).position == Point{0, 679},
+            "bottom-left corner placement failed");
+    require(placePopup({1919, 1079, 2, 20}, popup, screen).position == Point{1420, 679},
+            "bottom-right corner placement failed");
+    require(!placePopup({500, 900, 2, 20}, popup, screen).belowCaret,
+            "a caret near the bottom edge did not flip the popup above it");
+    require(placePopup({500, 900, 2, 20}, popup, screen).position == Point{500, 500},
+            "the flipped popup was not placed directly above the caret");
+
+    // Neither side fits: the larger remainder wins instead of always going down.
+    const Rect narrow{0, 0, 1920, 500};
+    require(placePopup({100, 460, 2, 20}, popup, narrow).belowCaret == false,
+            "the popup did not keep the larger visible remainder above the caret");
+    require(placePopup({100, 20, 2, 20}, popup, narrow).belowCaret,
+            "the popup did not keep the larger visible remainder below the caret");
+
+    require(centeredPopup(popup, screen) == Point{710, 340}, "centered fallback failed");
+    require(centeredPopup(popup, {-1920, 0, 1920, 1080}) == Point{-1210, 340},
+            "centered fallback on a negative-origin output failed");
+    require(centeredPopup({3000, 2000}, screen) == Point{0, 0},
+            "an oversized popup was not clamped to the output origin");
+}
+
 }
 
 int main() {
@@ -240,6 +363,9 @@ int main() {
         testKeyboard();
         testGlyphCoverage();
         testGeometry();
+        testCaretConversion();
+        testOutputSelection();
+        testPopupEdges();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

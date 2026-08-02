@@ -48,6 +48,13 @@ theme integration, screen selection, and layer-shell configuration. It cannot
 commit text and does not need keyboard focus. It receives logical key commands
 from the addon.
 
+Placement is decided by pure functions in the core library. The helper converts
+the caret rectangle from device pixels to logical pixels, selects the output
+containing the caret or the nearest one, and places the palette below the caret,
+above it when it does not fit, or centered on the active output when no caret
+rectangle exists. ADR 0006 records why native Wayland clients always take the
+fallback.
+
 The emoji grid uses `QAbstractListModel` with a uniform `QListView` icon layout,
 so delegates are created and painted only for visible cells. Category, search,
 favorite, recent-use, and variant state remains in the non-Qt core model.
@@ -91,7 +98,10 @@ original catalog sequence.
 1. A key event matching the configured shortcut's keysym or derived physical
    keycode creates a random 128-bit transaction identifier and a tracked
    reference to the triggering context.
-2. The addon captures the caret rectangle and sends `Show` to the helper.
+2. The addon sanitizes the caret rectangle from the source context and sends
+   `Show` to the helper, in client device pixels together with the client
+   scale factor. An empty rectangle at the origin means the frontend reports
+   no cursor position.
 3. While active, relevant keys are filtered before the input method and sent as
    bounded commands. Search text is never logged.
 4. The helper sends one `Select` response containing the transaction identifier
