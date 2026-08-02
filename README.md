@@ -19,8 +19,9 @@ desktop manual test matrix has not been executed.
 - Native `InputContext::commitString()` insertion through Fcitx 5.
 - Clipboard-independent operation with no synthetic input.
 - Non-activating LayerShellQt palette on Wayland.
-- Active-screen placement with caret-relative positioning when geometry is
-  available.
+- Caret-relative placement on every Fcitx5 frontend that reports a cursor
+  position, with a documented active-output fallback where none exists
+  (see *Picker placement*).
 - Bounded, versioned, replay-resistant D-Bus protocol between the addon and
   the crash-isolated Qt helper.
 - Atomic user-state writes and recovery from a damaged state file.
@@ -122,6 +123,40 @@ focusable popup. The first `Escape` press or pointer press elsewhere inside the
 picker closes only those controls. Clicking another application follows the
 normal source-focus rule and cancels the picker if the original input context
 loses focus.
+
+## Picker placement
+
+The picker opens next to the text caret whenever the Fcitx 5 frontend serving
+the focused application reports a cursor position. It opens below the caret,
+above it when there is no room below, on the monitor that holds the caret, and
+always inside the usable area of that monitor. The client scale factor is
+applied, so placement is correct at 125%, 150% and other fractional scaling
+factors.
+
+Native Wayland applications do not provide a caret position. The Wayland
+input-method protocols deliberately withhold global caret coordinates from the
+input method, and the only protocol that solves this,
+`zwp_input_popup_surface_v2`, can be used only by the process that owns the
+Wayland input-method connection, which is Fcitx 5 itself rather than this
+crash-isolated helper. For those applications the picker is centered on the
+active monitor. This is the documented fallback and is not a misconfiguration.
+
+Caret-relative placement is therefore active for X11 and XWayland applications,
+for applications configured with the Fcitx 5 Qt or GTK input-method modules
+(`QT_IM_MODULE=fcitx`, `GTK_IM_MODULE=fcitx`), and for any other frontend that
+reports a cursor rectangle.
+
+To see which path an application takes, restart Fcitx 5 with the diagnostic log
+category enabled and trigger the picker:
+
+```bash
+FCITX_LOG_RULE=emojipalette=debug fcitx5 --replace
+```
+
+Each activation logs the frontend name, the raw cursor rectangle, the scale
+factor, and whether the caret was usable. Search text and selected emoji are
+never logged. See `docs/adr/0006-caret-relative-placement.md` for the full
+rationale.
 
 ## Privacy and security model
 

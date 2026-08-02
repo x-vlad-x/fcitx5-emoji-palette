@@ -29,8 +29,10 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 namespace emoji_palette::ui {
 
@@ -569,25 +571,43 @@ void PaletteWindow::chooseSequence(std::string_view sequence) {
 }
 
 void PaletteWindow::positionFor(const ipc::Show& request) {
-    const bool hasCaret = request.caret.x != 0 || request.caret.y != 0 || request.caret.width > 0 ||
-                          request.caret.height > 0;
-    QScreen* screen = hasCaret ? QGuiApplication::screenAt({request.caret.x, request.caret.y})
-                               : QGuiApplication::screenAt(QCursor::pos());
+    const auto screens = QGuiApplication::screens();
+    if (screens.isEmpty()) {
+        return;
+    }
+    std::vector<Rect> outputs;
+    outputs.reserve(static_cast<std::size_t>(screens.size()));
+    for (const auto* candidate : screens) {
+        const QRect usable = candidate->availableGeometry();
+        outputs.push_back({usable.x(), usable.y(), usable.width(), usable.height()});
+    }
+
+    const auto caret = logicalCaret(request.caret, request.scalePercent);
+    QScreen* screen = nullptr;
+    if (caret) {
+        if (const auto index = outputForCaret(*caret, outputs)) {
+            screen = screens.at(static_cast<qsizetype>(*index));
+        }
+    }
+    if (screen == nullptr) {
+        // No caret rectangle, or no usable output near it. On Wayland the
+        // compositor picks the active output below; the pointer position is
+        // only meaningful on X11.
+        screen = QGuiApplication::screenAt(QCursor::pos());
+    }
     if (screen == nullptr) {
         screen = QGuiApplication::primaryScreen();
     }
     if (screen == nullptr) {
         return;
     }
+
     const QRect available = screen->availableGeometry();
     const Size popup{std::min(width(), available.width()), std::min(height(), available.height())};
     resize(popup.width, popup.height);
-    const Rect caret =
-        hasCaret
-            ? Rect{request.caret.x, request.caret.y, request.caret.width, request.caret.height}
-            : Rect{available.x() + (available.width() - popup.width) / 2, available.y() + 24, 0, 0};
     const Rect bounds{available.x(), available.y(), available.width(), available.height()};
-    const auto placement = placePopup(caret, popup, bounds);
+    const Point position =
+        caret ? placePopup(*caret, popup, bounds).position : centeredPopup(popup, bounds);
 
     winId();
     if (QGuiApplication::platformName().startsWith(QStringLiteral("wayland"))) {
@@ -596,24 +616,26 @@ void PaletteWindow::positionFor(const ipc::Show& request) {
             layer->setKeyboardInteractivity(LayerShellQt::Window::KeyboardInteractivityNone);
             layer->setActivateOnShow(false);
             layer->setExclusiveZone(0);
-            layer->setAnchors(hasCaret
-                                  ? LayerShellQt::Window::Anchors{LayerShellQt::Window::AnchorTop} |
-                                        LayerShellQt::Window::AnchorLeft
-                                  : LayerShellQt::Window::Anchors{LayerShellQt::Window::AnchorTop});
-            if (hasCaret) {
+            layer->setScope(QStringLiteral("fcitx5-emoji-palette"));
+            layer->setDesiredSize(size());
+            if (caret) {
+                layer->setAnchors(LayerShellQt::Window::Anchors{LayerShellQt::Window::AnchorTop} |
+                                  LayerShellQt::Window::AnchorLeft);
                 layer->setScreen(screen);
+                // Layer-shell margins are measured from the anchored edges of
+                // the output itself, not from the panel-adjusted area.
+                layer->setMargins({position.x - screen->geometry().x(),
+                                   position.y - screen->geometry().y(), 0, 0});
             } else {
+                // An unanchored layer surface is centered by the compositor on
+                // the output it is assigned to.
+                layer->setAnchors(LayerShellQt::Window::Anchors{});
+                layer->setMargins({});
                 layer->setWantsToBeOnActiveScreen(true);
             }
-            layer->setDesiredSize(size());
-            layer->setMargins(hasCaret
-                                  ? QMargins{placement.position.x - screen->geometry().x(),
-                                             placement.position.y - screen->geometry().y(), 0, 0}
-                                  : QMargins{0, 24, 0, 0});
-            layer->setScope(QStringLiteral("fcitx5-emoji-palette"));
         }
     } else {
-        move(placement.position.x, placement.position.y);
+        move(position.x, position.y);
     }
 }
 

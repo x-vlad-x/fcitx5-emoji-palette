@@ -7,7 +7,9 @@
 #include "emoji_palette/state.hpp"
 
 #include <QByteArray>
+#include <QGuiApplication>
 #include <QListView>
+#include <QScreen>
 #include <QSettings>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -16,6 +18,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -66,6 +69,9 @@ class HelperTests final : public QObject {
     void settingsPanelPreservesSession();
     void sessionSelectsOnce();
     void sessionRejectsWrongOwnerAndReplay();
+    void caretPlacementFollowsCaret();
+    void caretPlacementIsScaleIndependent();
+    void absentCaretIsCenteredOnScreen();
 };
 
 void HelperTests::localizedModelSearch() {
@@ -382,6 +388,87 @@ void HelperTests::sessionRejectsWrongOwnerAndReplay() {
     QVERIFY(session.exchange(command, sender).isEmpty());
     session.peerDisconnected(sender);
     QVERIFY(session.peerOwner().isEmpty());
+}
+
+namespace {
+
+emoji_palette::ui::PaletteWindow* compactWindow(QTemporaryDir& temporary,
+                                                emoji_palette::EmojiCatalog& catalog) {
+    const auto settingsPath = temporary.filePath(QStringLiteral("settings.ini"));
+    {
+        QSettings settings(settingsPath, QSettings::IniFormat);
+        settings.setValue(QStringLiteral("Ui/CellSize"), 40);
+        settings.setValue(QStringLiteral("Ui/Columns"), 6);
+        settings.setValue(QStringLiteral("Ui/Rows"), 4);
+    }
+    return new emoji_palette::ui::PaletteWindow(
+        catalog, std::filesystem::path(temporary.path().toStdString()) / "state", settingsPath);
+}
+
+emoji_palette::ipc::Show showRequest(std::uint8_t marker, emoji_palette::Rect caret,
+                                     std::uint16_t scalePercent) {
+    return {transaction(marker), caret, {0, 0, 0, 0}, emoji_palette::Locale::English,
+            scalePercent,        true};
+}
+
+}
+
+void HelperTests::caretPlacementFollowsCaret() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    emoji_palette::EmojiCatalog catalog;
+    const std::unique_ptr<emoji_palette::ui::PaletteWindow> window(
+        compactWindow(temporary, catalog));
+    auto* screen = QGuiApplication::primaryScreen();
+    QVERIFY(screen != nullptr);
+    const QRect available = screen->availableGeometry();
+    QVERIFY2(available.width() >= 600 && available.height() >= 500,
+             "the offscreen test screen is too small for caret placement checks");
+
+    const int caretX = available.x() + 120;
+    const int caretY = available.y() + 100;
+    window->showPalette(showRequest(9, {caretX, caretY, 2, 20}, 100));
+    QVERIFY2(caretY + 20 + window->height() <= available.y() + available.height(),
+             "the test caret must leave room for the popup below it");
+    QCOMPARE(window->pos(), QPoint(caretX, caretY + 20));
+}
+
+void HelperTests::caretPlacementIsScaleIndependent() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    emoji_palette::EmojiCatalog catalog;
+    const std::unique_ptr<emoji_palette::ui::PaletteWindow> window(
+        compactWindow(temporary, catalog));
+    auto* screen = QGuiApplication::primaryScreen();
+    QVERIFY(screen != nullptr);
+    const QRect available = screen->availableGeometry();
+    const int caretX = available.x() + 120;
+    const int caretY = available.y() + 100;
+
+    window->showPalette(showRequest(9, {caretX, caretY, 2, 20}, 100));
+    const QPoint unscaled = window->pos();
+    window->hidePalette();
+
+    // The same caret reported by a client rendering at 200 percent. Fcitx5
+    // reports device pixels, so the logical placement must not move.
+    window->showPalette(showRequest(10, {caretX * 2, caretY * 2, 4, 40}, 200));
+    QCOMPARE(window->pos(), unscaled);
+}
+
+void HelperTests::absentCaretIsCenteredOnScreen() {
+    QTemporaryDir temporary;
+    QVERIFY(temporary.isValid());
+    emoji_palette::EmojiCatalog catalog;
+    const std::unique_ptr<emoji_palette::ui::PaletteWindow> window(
+        compactWindow(temporary, catalog));
+    auto* screen = QGuiApplication::primaryScreen();
+    QVERIFY(screen != nullptr);
+    const QRect available = screen->availableGeometry();
+
+    window->showPalette(showRequest(11, {0, 0, 0, 0}, 100));
+    const QPoint expected(available.x() + (available.width() - window->width()) / 2,
+                          available.y() + (available.height() - window->height()) / 2);
+    QCOMPARE(window->pos(), expected);
 }
 
 QTEST_MAIN(HelperTests)

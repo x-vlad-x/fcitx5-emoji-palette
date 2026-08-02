@@ -125,14 +125,6 @@ class Reader {
     std::size_t position_ = 0;
 };
 
-bool validRectangle(const Rect& value) {
-    constexpr int coordinateLimit = 1000000;
-    constexpr int dimensionLimit = 32768;
-    return value.x >= -coordinateLimit && value.x <= coordinateLimit &&
-           value.y >= -coordinateLimit && value.y <= coordinateLimit && value.width >= 0 &&
-           value.width <= dimensionLimit && value.height >= 0 && value.height <= dimensionLimit;
-}
-
 bool validTransaction(const TransactionId& value) {
     return std::any_of(value.bytes.begin(), value.bytes.end(),
                        [](std::uint8_t byte) { return byte != 0; });
@@ -189,9 +181,10 @@ bool writePayload(Writer& writer, const Payload& payload) {
                 writer.integer(value.nonce);
                 writer.integer(value.capabilities);
             } else if constexpr (std::is_same_v<Value, Show>) {
-                if (!validTransaction(value.transaction) || !validRectangle(value.caret) ||
-                    !validRectangle(value.screen) || value.scalePercent < 50 ||
-                    value.scalePercent > 400) {
+                if (!validTransaction(value.transaction) || !isTransportableRect(value.caret) ||
+                    !isTransportableRect(value.screen) ||
+                    value.scalePercent < minimumScalePercent ||
+                    value.scalePercent > maximumScalePercent) {
                     return false;
                 }
                 writer.transaction(value.transaction);
@@ -259,8 +252,9 @@ std::optional<Payload> readPayload(MessageType type, Reader& reader, ProtocolErr
         const auto scale = reader.integer<std::uint16_t>();
         const auto close = reader.integer<std::uint8_t>();
         if (!transaction || !validTransaction(*transaction) || !caret || !screen || !locale ||
-            !scale || !close || !validRectangle(*caret) || !validRectangle(*screen) ||
-            !validLocale(*locale) || *scale < 50 || *scale > 400 || *close > 1) {
+            !scale || !close || !isTransportableRect(*caret) || !isTransportableRect(*screen) ||
+            !validLocale(*locale) || *scale < minimumScalePercent || *scale > maximumScalePercent ||
+            *close > 1) {
             error = ProtocolError::ValueOutOfRange;
             return std::nullopt;
         }

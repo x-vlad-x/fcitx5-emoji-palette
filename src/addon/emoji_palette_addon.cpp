@@ -1,4 +1,5 @@
 #include "emoji_palette/catalog.hpp"
+#include "emoji_palette/geometry.hpp"
 #include "emoji_palette/ipc/protocol.hpp"
 #include "emoji_palette/ipc/session.hpp"
 #include "emoji_palette/selection_controller.hpp"
@@ -7,6 +8,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
@@ -27,6 +29,7 @@
 #include <fcitx-utils/i18n.h>
 #include <fcitx-utils/key.h>
 #include <fcitx-utils/keysym.h>
+#include <fcitx-utils/log.h>
 #include <fcitx/addonfactory.h>
 #include <fcitx/addoninstance.h>
 #include <fcitx/addonmanager.h>
@@ -48,6 +51,12 @@ using emoji_palette::ipc::Selected;
 using emoji_palette::ipc::Show;
 using emoji_palette::ipc::TransactionId;
 using emoji_palette::ipc::Welcome;
+
+FCITX_DEFINE_LOG_CATEGORY(paletteLogCategory, "emojipalette")
+
+// Geometry and frontend identity only. Search text and selected sequences
+// are never written to the log.
+#define EMOJI_PALETTE_PLACEMENT() FCITX_LOGC(paletteLogCategory, Debug)
 
 constexpr char serviceName[] = "org.fcitx.Fcitx5.EmojiPalette1";
 constexpr char objectPath[] = "/org/fcitx/Fcitx5/EmojiPalette1";
@@ -72,6 +81,16 @@ emoji_palette::Locale currentLocale() {
         return emoji_palette::Locale::Russian;
     }
     return emoji_palette::Locale::English;
+}
+
+std::uint16_t scalePercent(double scaleFactor) {
+    if (!std::isfinite(scaleFactor) || scaleFactor <= 0.0) {
+        return 100;
+    }
+    const auto percent = static_cast<int>(std::lround(scaleFactor * 100.0));
+    return static_cast<std::uint16_t>(
+        std::clamp(percent, static_cast<int>(emoji_palette::minimumScalePercent),
+                   static_cast<int>(emoji_palette::maximumScalePercent)));
 }
 
 TransactionId createTransaction() {
@@ -271,14 +290,20 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
 
     void sendShow(fcitx::InputContext& context, TransactionId transaction) {
         const auto& cursor = context.cursorRect();
-        const auto scale = std::clamp(static_cast<int>(context.scaleFactor() * 100.0), 50, 400);
+        const auto caret = emoji_palette::sanitizedCaret(
+            {cursor.left(), cursor.top(), cursor.width(), cursor.height()});
+        const auto scale = scalePercent(context.scaleFactor());
+        EMOJI_PALETTE_PLACEMENT() << "Show frontend=" << std::string(context.frontendName())
+                                  << " rawCaret=" << cursor.left() << "," << cursor.top() << ","
+                                  << cursor.width() << "," << cursor.height()
+                                  << " scaleFactor=" << context.scaleFactor()
+                                  << " scalePercent=" << scale
+                                  << " caretUsable=" << (caret != emoji_palette::absentCaret);
+        // Show::screen is reserved: Fcitx5 exposes no output geometry, so the
+        // helper resolves the output from the caret or from the active output.
         const Envelope envelope{emoji_palette::ipc::protocolVersion,
-                                Show{transaction,
-                                     {cursor.left(), cursor.top(), cursor.width(), cursor.height()},
-                                     {0, 0, 0, 0},
-                                     currentLocale(),
-                                     static_cast<std::uint16_t>(scale),
-                                     closeAfterSelection_}};
+                                Show{transaction, caret, emoji_palette::absentCaret,
+                                     currentLocale(), scale, closeAfterSelection_}};
         sendEnvelope(envelope);
     }
 

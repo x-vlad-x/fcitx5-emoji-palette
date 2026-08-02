@@ -7,11 +7,14 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <set>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -228,6 +231,111 @@ void testGeometry() {
             "oversized popup clamp failed");
 }
 
+void testCaretConversion() {
+    using emoji_palette::absentCaret;
+    using emoji_palette::logicalCaret;
+    using emoji_palette::Rect;
+    using emoji_palette::sanitizedCaret;
+
+    require(!logicalCaret(absentCaret, 100).has_value(),
+            "an absent caret rectangle must not be treated as a caret at the origin");
+    require(!logicalCaret({100, 100, 2, 20}, 49).has_value(), "a scale below the floor was used");
+    require(!logicalCaret({100, 100, 2, 20}, 401).has_value(),
+            "a scale above the ceiling was used");
+    require(!logicalCaret({emoji_palette::coordinateLimit + 1, 0, 2, 20}, 100).has_value(),
+            "an out-of-range caret rectangle was accepted");
+
+    require(logicalCaret({100, 200, 2, 20}, 100) == Rect{100, 200, 2, 20},
+            "unscaled conversion changed the rectangle");
+    require(logicalCaret({125, 250, 3, 25}, 125) == Rect{100, 200, 2, 20},
+            "125 percent conversion failed");
+    require(logicalCaret({150, 300, 3, 30}, 150) == Rect{100, 200, 2, 20},
+            "150 percent conversion failed");
+    require(logicalCaret({200, 400, 4, 40}, 200) == Rect{100, 200, 2, 20},
+            "200 percent conversion failed");
+    require(logicalCaret({-1920, -300, 3, 30}, 150) == Rect{-1280, -200, 2, 20},
+            "negative-origin conversion failed");
+    require(logicalCaret({151, 0, 0, 0}, 150) == Rect{101, 0, 0, 0},
+            "conversion did not round to the nearest logical pixel");
+
+    require(sanitizedCaret({10, 20, 2, 20}) == Rect{10, 20, 2, 20},
+            "a valid caret rectangle was altered");
+    // A frontend that reports an unknown extent as a zero bottom-right corner
+    // yields negative dimensions the wire format would reject.
+    require(sanitizedCaret({10, 20, -10, -20}) == Rect{10, 20, 0, 0},
+            "negative caret dimensions were not clamped");
+    require(sanitizedCaret({emoji_palette::coordinateLimit + 1, 0, 2, 20}) == absentCaret,
+            "an out-of-range caret rectangle was not rejected");
+    require(sanitizedCaret({0, 0, 0, 0}) == absentCaret, "the absent sentinel was not preserved");
+}
+
+void testOutputSelection() {
+    using emoji_palette::outputForCaret;
+    using emoji_palette::Rect;
+
+    const std::array<Rect, 3> outputs{Rect{-1920, 0, 1920, 1080}, Rect{0, 0, 2560, 1440},
+                                      Rect{2560, 200, 1920, 1080}};
+    const std::span<const Rect> view{outputs};
+
+    require(outputForCaret({-100, 500, 2, 20}, view) == std::size_t{0},
+            "a caret on the negative-origin output selected another output");
+    require(outputForCaret({10, 10, 2, 20}, view) == std::size_t{1},
+            "a caret on the primary output selected another output");
+    require(outputForCaret({3000, 400, 2, 20}, view) == std::size_t{2},
+            "a caret on the right-hand output selected another output");
+    // A caret above the right-hand output lies in no output at all.
+    require(outputForCaret({3000, 0, 2, 20}, view) == std::size_t{2},
+            "a caret in a gap did not select the nearest output");
+    require(outputForCaret({9000, 9000, 2, 20}, view) == std::size_t{2},
+            "a caret beyond every output did not select the nearest output");
+    require(outputForCaret({-9000, 500, 2, 20}, view) == std::size_t{0},
+            "a caret left of every output did not select the nearest output");
+
+    const std::array<Rect, 2> empty{Rect{0, 0, 0, 0}, Rect{0, 0, 1920, 1080}};
+    require(outputForCaret({10, 10, 2, 20}, std::span<const Rect>{empty}) == std::size_t{1},
+            "an empty output was selected");
+    require(!outputForCaret({10, 10, 2, 20}, std::span<const Rect>{}).has_value(),
+            "an output was selected from an empty list");
+}
+
+void testPopupEdges() {
+    using emoji_palette::centeredPopup;
+    using emoji_palette::placePopup;
+    using emoji_palette::Point;
+    using emoji_palette::Rect;
+    using emoji_palette::Size;
+
+    const Rect screen{0, 0, 1920, 1080};
+    const Size popup{500, 400};
+
+    require(placePopup({0, 0, 2, 20}, popup, screen) ==
+                emoji_palette::PopupPlacement{{0, 20}, true},
+            "top-left corner placement failed");
+    require(placePopup({1919, 0, 2, 20}, popup, screen).position == Point{1420, 20},
+            "top-right corner placement failed");
+    require(placePopup({0, 1079, 2, 20}, popup, screen).position == Point{0, 679},
+            "bottom-left corner placement failed");
+    require(placePopup({1919, 1079, 2, 20}, popup, screen).position == Point{1420, 679},
+            "bottom-right corner placement failed");
+    require(!placePopup({500, 900, 2, 20}, popup, screen).belowCaret,
+            "a caret near the bottom edge did not flip the popup above it");
+    require(placePopup({500, 900, 2, 20}, popup, screen).position == Point{500, 500},
+            "the flipped popup was not placed directly above the caret");
+
+    // Neither side fits: the larger remainder wins instead of always going down.
+    const Rect narrow{0, 0, 1920, 500};
+    require(placePopup({100, 460, 2, 20}, popup, narrow).belowCaret == false,
+            "the popup did not keep the larger visible remainder above the caret");
+    require(placePopup({100, 20, 2, 20}, popup, narrow).belowCaret,
+            "the popup did not keep the larger visible remainder below the caret");
+
+    require(centeredPopup(popup, screen) == Point{710, 340}, "centered fallback failed");
+    require(centeredPopup(popup, {-1920, 0, 1920, 1080}) == Point{-1210, 340},
+            "centered fallback on a negative-origin output failed");
+    require(centeredPopup({3000, 2000}, screen) == Point{0, 0},
+            "an oversized popup was not clamped to the output origin");
+}
+
 }
 
 int main() {
@@ -240,6 +348,9 @@ int main() {
         testKeyboard();
         testGlyphCoverage();
         testGeometry();
+        testCaretConversion();
+        testOutputSelection();
+        testPopupEdges();
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

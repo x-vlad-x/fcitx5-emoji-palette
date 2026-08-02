@@ -22,8 +22,16 @@ All integers use network byte order.
 | 12 | variable | Type-specific payload |
 
 The complete envelope is limited to 64 KiB. Search text is limited to 256 UTF-8
-bytes and a selection to 128 UTF-8 bytes. Rectangles use signed 32-bit logical
+bytes and a selection to 128 UTF-8 bytes. Rectangles use signed 32-bit
 coordinates with explicit safe bounds.
+
+`Show` carries the caret rectangle in the source client's device pixels
+together with `scalePercent`, the client scale factor in percent. The receiver
+divides by that factor to obtain logical pixels. An empty rectangle at the
+origin means the Fcitx5 frontend reports no cursor position, which is the
+normal case for native Wayland clients. `Show.screen` is reserved and always
+empty: Fcitx5 exposes no output geometry, so the helper resolves the output
+itself.
 
 ## Handshake and ownership
 

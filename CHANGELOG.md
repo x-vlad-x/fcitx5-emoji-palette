@@ -4,6 +4,13 @@ All notable user-visible changes are documented here.
 
 ## Unreleased
 
+- Placed the picker next to the text caret whenever the Fcitx5 frontend
+  reports one, honouring the client scale factor at fractional scaling,
+  choosing the output that holds the caret, flipping the picker above the
+  caret near the bottom edge, and clamping it inside the usable area. Native
+  Wayland clients report no caret position at all, so the picker is now
+  centered on the active output there instead of being pinned near the top of
+  the primary monitor.
 - Consumed every key event on the source input context while the picker is
   active, so search and navigation keystrokes can no longer leak into the
   source application on any keyboard layout, and made printable search input
