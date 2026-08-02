@@ -17,6 +17,7 @@
 #include <QtTest>
 
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <memory>
 #include <string>
@@ -425,12 +426,16 @@ void HelperTests::caretPlacementFollowsCaret() {
     QVERIFY2(available.width() >= 600 && available.height() >= 500,
              "the offscreen test screen is too small for caret placement checks");
 
-    const int caretX = available.x() + 120;
-    const int caretY = available.y() + 100;
+    const int caretX = available.x() + 40;
+    const int caretY = available.y() + 40;
     window->showPalette(showRequest(9, {caretX, caretY, 2, 20}, 100));
-    QVERIFY2(caretY + 20 + window->height() <= available.y() + available.height(),
-             "the test caret must leave room for the popup below it");
-    QCOMPARE(window->pos(), QPoint(caretX, caretY + 20));
+
+    // The popup sits immediately below the caret, or immediately above it when
+    // there is no room below. Its own size depends on the platform theme, so
+    // the expectation is derived from the size it actually has.
+    const bool fitsBelow = caretY + 20 + window->height() <= available.y() + available.height();
+    QCOMPARE(window->pos(),
+             fitsBelow ? QPoint(caretX, caretY + 20) : QPoint(caretX, caretY - window->height()));
 }
 
 void HelperTests::clientScaleDoesNotMoveThePopup() {
@@ -467,9 +472,18 @@ void HelperTests::absentCaretIsCenteredOnScreen() {
     const QRect available = screen->availableGeometry();
 
     window->showPalette(showRequest(11, {0, 0, 0, 0}, 100));
-    const QPoint expected(available.x() + (available.width() - window->width()) / 2,
-                          available.y() + (available.height() - window->height()) / 2);
-    QCOMPARE(window->pos(), expected);
+
+    // Centering is asserted as equal margins rather than as one exact point,
+    // so the check does not depend on the popup size the platform theme
+    // produces. Integer division leaves at most one pixel of asymmetry.
+    QVERIFY2(window->width() < available.width() && window->height() < available.height(),
+             "the offscreen test screen is too small to centre the palette on");
+    const int leftGap = window->x() - available.x();
+    const int rightGap = available.x() + available.width() - (window->x() + window->width());
+    const int topGap = window->y() - available.y();
+    const int bottomGap = available.y() + available.height() - (window->y() + window->height());
+    QVERIFY2(std::abs(leftGap - rightGap) <= 1, "the palette was not centred horizontally");
+    QVERIFY2(std::abs(topGap - bottomGap) <= 1, "the palette was not centred vertically");
 }
 
 QTEST_MAIN(HelperTests)

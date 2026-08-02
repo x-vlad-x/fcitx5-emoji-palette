@@ -12,6 +12,7 @@
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QLayout>
 #include <QListView>
 #include <QLoggingCategory>
 #include <QPainter>
@@ -612,6 +613,13 @@ std::uint16_t PaletteWindow::knownOutputScale(const QScreen& screen) const {
 
 void PaletteWindow::positionFor(const ipc::Show& request) {
     rememberOutputScale();
+    // The layout only imposes its minimum size when it runs, which otherwise
+    // happens on show, after this placement. Run it now so the size used here
+    // is the size the palette will actually have.
+    ensurePolished();
+    if (auto* contents = layout()) {
+        contents->activate();
+    }
     const auto screens = QGuiApplication::screens();
     if (screens.isEmpty()) {
         return;
