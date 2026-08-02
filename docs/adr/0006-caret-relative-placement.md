@@ -54,7 +54,9 @@ together with the client scale factor, and transmits an empty rectangle at the
 origin when no usable position exists. It records the frontend name, the raw
 rectangle, the scale factor and the resulting decision in the `emojipalette`
 log category, so the capture stage is diagnosable in the field without logging
-any search text or selected sequence.
+any search text or selected sequence. The helper records the converted caret,
+the chosen output and the final position under the
+`org.fcitx.EmojiPalette.placement` Qt logging category.
 
 The helper converts the rectangle to logical pixels, selects the output whose
 usable area contains the caret or else the nearest output, places the palette

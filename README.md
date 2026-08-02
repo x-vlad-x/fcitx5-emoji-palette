@@ -146,17 +146,34 @@ for applications configured with the Fcitx 5 Qt or GTK input-method modules
 (`QT_IM_MODULE=fcitx`, `GTK_IM_MODULE=fcitx`), and for any other frontend that
 reports a cursor rectangle.
 
-To see which path an application takes, restart Fcitx 5 with the diagnostic log
-category enabled and trigger the picker:
+To see which path an application takes, enable the addon's diagnostic log
+category. Fcitx 5 log levels are numeric and `5` is debug:
 
 ```bash
-FCITX_LOG_RULE=emojipalette=debug fcitx5 --replace
+busctl --user call org.fcitx.Fcitx5 /controller \
+  org.fcitx.Fcitx.Controller1 SetLogRule s 'emojipalette=5'
 ```
 
-Each activation logs the frontend name, the raw cursor rectangle, the scale
-factor, and whether the caret was usable. Search text and selected emoji are
-never logged. See `docs/adr/0006-caret-relative-placement.md` for the full
-rationale.
+The same rule can be passed at startup with `fcitx5 --verbose 'emojipalette=5'`.
+Each activation then logs the frontend name, the raw cursor rectangle, the
+scale factor, and whether the caret was usable:
+
+```text
+Show frontend=wayland rawCaret=0,0,0,0 scaleFactor=1 scalePercent=100 caretUsable=0
+Show frontend=dbus rawCaret=782,302,2,26 scaleFactor=1 scalePercent=100 caretUsable=1
+```
+
+The helper logs the placement it derived under
+`org.fcitx.EmojiPalette.placement`, which reports the converted caret, the
+chosen output, and the final position:
+
+```bash
+QT_LOGGING_RULES='org.fcitx.EmojiPalette.placement=true' \
+  /usr/libexec/fcitx5-emoji-palette-ui
+```
+
+Search text and selected emoji are never logged. See
+`docs/adr/0006-caret-relative-placement.md` for the full rationale.
 
 ## Privacy and security model
 

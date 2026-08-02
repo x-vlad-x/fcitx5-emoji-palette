@@ -40,6 +40,9 @@ namespace {
 
 Q_LOGGING_CATEGORY(logState, "org.fcitx.EmojiPalette.state")
 
+// Geometry only. Search text and selected sequences are never logged.
+Q_LOGGING_CATEGORY(logPlacement, "org.fcitx.EmojiPalette.placement")
+
 QString fromUtf8(std::string_view value) {
     return QString::fromUtf8(value.data(), static_cast<qsizetype>(value.size()));
 }
@@ -608,6 +611,20 @@ void PaletteWindow::positionFor(const ipc::Show& request) {
     const Rect bounds{available.x(), available.y(), available.width(), available.height()};
     const Point position =
         caret ? placePopup(*caret, popup, bounds).position : centeredPopup(popup, bounds);
+
+    qCDebug(logPlacement).nospace()
+        << "platform=" << QGuiApplication::platformName() << " rawCaret=" << request.caret.x << ","
+        << request.caret.y << "," << request.caret.width << "," << request.caret.height
+        << " scalePercent=" << request.scalePercent << " logicalCaret="
+        << (caret ? QStringLiteral("%1,%2,%3,%4")
+                        .arg(caret->x)
+                        .arg(caret->y)
+                        .arg(caret->width)
+                        .arg(caret->height)
+                  : QStringLiteral("absent"))
+        << " output=" << screen->name() << " geometry=" << screen->geometry()
+        << " available=" << available << " popup=" << popup.width << "x" << popup.height
+        << " position=" << position.x << "," << position.y;
 
     winId();
     if (QGuiApplication::platformName().startsWith(QStringLiteral("wayland"))) {
