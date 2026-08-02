@@ -191,6 +191,7 @@ void PaletteWindow::showPalette(const ipc::Show& request) {
 }
 
 void PaletteWindow::hidePalette() {
+    rememberOutputScale();
     setSettingsPanelVisible(false);
     hide();
     variantsPanel_->hide();
@@ -589,8 +590,10 @@ std::uint16_t scalePercentOf(double ratio) {
 }
 
 void PaletteWindow::rememberOutputScale() {
+    // Only a mapped surface carries the real fractional scale; before that the
+    // window still reports the output's integer buffer scale.
     const auto* handle = windowHandle();
-    if (handle == nullptr || handle->screen() == nullptr) {
+    if (handle == nullptr || !handle->isExposed() || handle->screen() == nullptr) {
         return;
     }
     outputScales_.insert(handle->screen()->name(), scalePercentOf(handle->devicePixelRatio()));
@@ -608,6 +611,7 @@ std::uint16_t PaletteWindow::knownOutputScale(const QScreen& screen) const {
 }
 
 void PaletteWindow::positionFor(const ipc::Show& request) {
+    rememberOutputScale();
     const auto screens = QGuiApplication::screens();
     if (screens.isEmpty()) {
         return;
