@@ -77,6 +77,15 @@ scale factor, the device-pixel layout an X11 or XWayland client sees is not a
 simple product of the logical layout; the nearest-output rule keeps such a
 caret on a real output rather than off-screen.
 
+Qt reports the integer buffer scale of a Wayland output, not its fractional
+scale, and the fractional scale of an output only reaches a client once one of
+its surfaces has been mapped there. A reported ratio of exactly one is
+therefore the only value usable without a mapped surface, because no larger
+fractional scale rounds down to it. The helper records the real scale of every
+output the palette has appeared on and uses the documented fallback while an
+output's scale is still only an upper bound, rather than converting with a
+value it knows may be wrong.
+
 When no caret rectangle is available, the palette is centered on the active
 output. On Wayland this uses an unanchored layer surface, which the compositor
 centers on the output it assigns, combined with the active-output request; the

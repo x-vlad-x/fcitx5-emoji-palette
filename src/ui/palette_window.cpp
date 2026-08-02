@@ -280,6 +280,10 @@ void PaletteWindow::setGlyphProbe(GlyphProbe probe) {
 
 void PaletteWindow::changeEvent(QEvent* event) {
     QWidget::changeEvent(event);
+    if (event->type() == QEvent::DevicePixelRatioChange) {
+        rememberOutputScale();
+        return;
+    }
     if (event->type() != QEvent::FontChange) {
         return;
     }
@@ -576,12 +580,31 @@ void PaletteWindow::chooseSequence(std::string_view sequence) {
 
 namespace {
 
-std::uint16_t outputScalePercent(const QScreen& screen) {
-    const auto percent = static_cast<int>(std::lround(screen.devicePixelRatio() * 100.0));
+std::uint16_t scalePercentOf(double ratio) {
+    const auto percent = static_cast<int>(std::lround(ratio * 100.0));
     return static_cast<std::uint16_t>(std::clamp(percent, static_cast<int>(minimumScalePercent),
                                                  static_cast<int>(maximumScalePercent)));
 }
 
+}
+
+void PaletteWindow::rememberOutputScale() {
+    const auto* handle = windowHandle();
+    if (handle == nullptr || handle->screen() == nullptr) {
+        return;
+    }
+    outputScales_.insert(handle->screen()->name(), scalePercentOf(handle->devicePixelRatio()));
+}
+
+std::uint16_t PaletteWindow::knownOutputScale(const QScreen& screen) const {
+    // Qt reports the integer buffer scale of a Wayland output; its fractional
+    // scale only arrives once a surface of ours has been mapped on it. A
+    // reported ratio of exactly one needs no surface, because no larger
+    // fractional scale rounds down to it.
+    if (scalePercentOf(screen.devicePixelRatio()) == 100) {
+        return 100;
+    }
+    return outputScales_.value(screen.name(), 0);
 }
 
 void PaletteWindow::positionFor(const ipc::Show& request) {
@@ -596,9 +619,10 @@ void PaletteWindow::positionFor(const ipc::Show& request) {
     nativeOutputs.reserve(static_cast<std::size_t>(screens.size()));
     for (const auto* candidate : screens) {
         const QRect logical = candidate->geometry();
+        const auto known = knownOutputScale(*candidate);
         nativeOutputs.push_back(
             nativeOutputBounds({logical.x(), logical.y(), logical.width(), logical.height()},
-                               outputScalePercent(*candidate)));
+                               known != 0 ? known : scalePercentOf(candidate->devicePixelRatio())));
     }
 
     const bool hasCaret = request.caret != absentCaret && isTransportableRect(request.caret);
@@ -626,11 +650,15 @@ void PaletteWindow::positionFor(const ipc::Show& request) {
     const Size popup{std::min(width(), available.width()), std::min(height(), available.height())};
     resize(popup.width, popup.height);
     const Rect bounds{available.x(), available.y(), available.width(), available.height()};
+    // Converting with a scale that is only an upper bound would put the picker
+    // somewhere it does not belong, so the documented fallback is used until
+    // this output's real scale is known.
+    const auto outputScale = knownOutputScale(*screen);
     std::optional<Rect> caret;
-    if (hasCaret) {
+    if (hasCaret && outputScale != 0) {
         caret = logicalFromNative(request.caret,
                                   {geometry.x(), geometry.y(), geometry.width(), geometry.height()},
-                                  outputScalePercent(*screen));
+                                  outputScale);
     }
     const Point position =
         caret ? placePopup(*caret, popup, bounds).position : centeredPopup(popup, bounds);
@@ -639,7 +667,7 @@ void PaletteWindow::positionFor(const ipc::Show& request) {
         << "platform=" << QGuiApplication::platformName() << " rawCaret=" << request.caret.x << ","
         << request.caret.y << "," << request.caret.width << "," << request.caret.height
         << " clientScalePercent=" << request.scalePercent << " output=" << screen->name()
-        << " outputScalePercent=" << outputScalePercent(*screen) << " geometry=" << geometry
+        << " outputScalePercent=" << outputScale << " geometry=" << geometry
         << " available=" << available << " logicalCaret="
         << (caret ? QStringLiteral("%1,%2,%3,%4")
                         .arg(caret->x)

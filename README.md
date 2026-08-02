@@ -133,6 +133,12 @@ always inside the usable area of that monitor. The client scale factor is
 applied, so placement is correct at 125%, 150% and other fractional scaling
 factors.
 
+On an output using a fractional scale such as 125% or 150%, the first
+activation of the palette on that output uses the centered fallback. Wayland
+reports an output's fractional scale to a client only after one of its windows
+has appeared there, and the picker places itself at the caret rather than at an
+estimate. Every later activation on that output is caret-relative.
+
 Native Wayland applications do not provide a caret position. The Wayland
 input-method protocols deliberately withhold global caret coordinates from the
 input method, and the only protocol that solves this,
