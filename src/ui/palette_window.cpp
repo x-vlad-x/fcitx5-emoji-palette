@@ -651,8 +651,10 @@ void PaletteWindow::positionFor(const ipc::Show& request) {
 
     const QRect geometry = screen->geometry();
     const QRect available = screen->availableGeometry();
-    const Size popup{std::min(width(), available.width()), std::min(height(), available.height())};
-    resize(popup.width, popup.height);
+    // Resize first: a layout minimum can keep the widget larger than the
+    // requested size, and placement has to use the size Qt actually applied.
+    resize(std::min(width(), available.width()), std::min(height(), available.height()));
+    const Size popup{width(), height()};
     const Rect bounds{available.x(), available.y(), available.width(), available.height()};
     // Converting with a scale that is only an upper bound would put the picker
     // somewhere it does not belong, so the documented fallback is used until
