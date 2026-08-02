@@ -25,13 +25,15 @@ The complete envelope is limited to 64 KiB. Search text is limited to 256 UTF-8
 bytes and a selection to 128 UTF-8 bytes. Rectangles use signed 32-bit
 coordinates with explicit safe bounds.
 
-`Show` carries the caret rectangle in the source client's device pixels
-together with `scalePercent`, the client scale factor in percent. The receiver
-divides by that factor to obtain logical pixels. An empty rectangle at the
-origin means the Fcitx5 frontend reports no cursor position, which is the
-normal case for native Wayland clients. `Show.screen` is reserved and always
-empty: Fcitx5 exposes no output geometry, so the helper resolves the output
-itself.
+`Show` carries an absolute caret rectangle in the device pixels of the output
+that holds it. The receiver resolves the output in that same space and converts
+with the output scale factor, not with the client scale. An empty rectangle at
+the origin means no usable absolute position exists, which is the normal case
+for native Wayland clients and for any client whose rectangle is relative to
+its own window. `Show.scalePercent` carries the scale factor the client reports
+for itself; it is diagnostic only and is never used for placement.
+`Show.screen` is reserved and always empty: Fcitx5 exposes no output geometry,
+so the helper resolves the output itself.
 
 ## Handshake and ownership
 

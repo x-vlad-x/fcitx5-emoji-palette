@@ -7,12 +7,16 @@
 namespace emoji_palette {
 namespace {
 
-int toLogical(int value, std::uint16_t scalePercent) {
+int scaleUp(int value, std::uint16_t scalePercent) {
+    const auto scaled = static_cast<std::int64_t>(value) * scalePercent;
+    return static_cast<int>(scaled >= 0 ? (scaled + 50) / 100 : -((-scaled + 50) / 100));
+}
+
+int scaleDown(int value, std::uint16_t scalePercent) {
     const auto scaled = static_cast<std::int64_t>(value) * 100;
     const auto divisor = static_cast<std::int64_t>(scalePercent);
-    const auto rounded =
-        scaled >= 0 ? (scaled + divisor / 2) / divisor : -((-scaled + divisor / 2) / divisor);
-    return static_cast<int>(rounded);
+    return static_cast<int>(scaled >= 0 ? (scaled + divisor / 2) / divisor
+                                        : -((-scaled + divisor / 2) / divisor));
 }
 
 std::int64_t axisDistance(int value, int origin, int extent) {
@@ -53,13 +57,15 @@ Rect sanitizedCaret(const Rect& raw) {
     return isTransportableRect(candidate) ? candidate : absentCaret;
 }
 
-std::optional<Rect> logicalCaret(const Rect& caret, std::uint16_t scalePercent) {
-    if (caret == absentCaret || !isTransportableRect(caret) || scalePercent < minimumScalePercent ||
-        scalePercent > maximumScalePercent) {
-        return std::nullopt;
-    }
-    return Rect{toLogical(caret.x, scalePercent), toLogical(caret.y, scalePercent),
-                toLogical(caret.width, scalePercent), toLogical(caret.height, scalePercent)};
+Rect nativeOutputBounds(const Rect& logicalOutput, std::uint16_t scalePercent) {
+    return {logicalOutput.x, logicalOutput.y, scaleUp(logicalOutput.width, scalePercent),
+            scaleUp(logicalOutput.height, scalePercent)};
+}
+
+Rect logicalFromNative(const Rect& native, const Rect& logicalOutput, std::uint16_t scalePercent) {
+    return {logicalOutput.x + scaleDown(native.x - logicalOutput.x, scalePercent),
+            logicalOutput.y + scaleDown(native.y - logicalOutput.y, scalePercent),
+            scaleDown(native.width, scalePercent), scaleDown(native.height, scalePercent)};
 }
 
 std::optional<std::size_t> outputForCaret(const Rect& caret, std::span<const Rect> outputs) {

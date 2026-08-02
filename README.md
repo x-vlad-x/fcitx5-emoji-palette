@@ -142,9 +142,12 @@ crash-isolated helper. For those applications the picker is centered on the
 active monitor. This is the documented fallback and is not a misconfiguration.
 
 Caret-relative placement is therefore active for X11 and XWayland applications,
-for applications configured with the Fcitx 5 Qt or GTK input-method modules
-(`QT_IM_MODULE=fcitx`, `GTK_IM_MODULE=fcitx`), and for any other frontend that
-reports a cursor rectangle.
+including applications configured with the Fcitx 5 Qt or GTK input-method
+modules (`QT_IM_MODULE=fcitx`, `GTK_IM_MODULE=fcitx`) under XWayland, and for
+any other frontend that reports an absolute cursor rectangle. Those input-method
+modules report a window-relative rectangle when the application itself runs on
+Wayland, which no separate process can resolve, so those applications receive
+the centered fallback as well.
 
 To see which path an application takes, enable the addon's diagnostic log
 category. Fcitx 5 log levels are numeric and `5` is debug:
@@ -159,8 +162,8 @@ Each activation then logs the frontend name, the raw cursor rectangle, the
 scale factor, and whether the caret was usable:
 
 ```text
-Show frontend=wayland rawCaret=0,0,0,0 scaleFactor=1 scalePercent=100 caretUsable=0
-Show frontend=dbus rawCaret=782,302,2,26 scaleFactor=1 scalePercent=100 caretUsable=1
+Show frontend=wayland rawCaret=0,0,0,0 relativeRect=0 clientScalePercent=100 caretUsable=0
+Show frontend=dbus rawCaret=782,302,2,26 relativeRect=0 clientScalePercent=100 caretUsable=1
 ```
 
 The helper logs the placement it derived under

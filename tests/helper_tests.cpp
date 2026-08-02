@@ -70,7 +70,7 @@ class HelperTests final : public QObject {
     void sessionSelectsOnce();
     void sessionRejectsWrongOwnerAndReplay();
     void caretPlacementFollowsCaret();
-    void caretPlacementIsScaleIndependent();
+    void clientScaleDoesNotMoveThePopup();
     void absentCaretIsCenteredOnScreen();
 };
 
@@ -433,7 +433,7 @@ void HelperTests::caretPlacementFollowsCaret() {
     QCOMPARE(window->pos(), QPoint(caretX, caretY + 20));
 }
 
-void HelperTests::caretPlacementIsScaleIndependent() {
+void HelperTests::clientScaleDoesNotMoveThePopup() {
     QTemporaryDir temporary;
     QVERIFY(temporary.isValid());
     emoji_palette::EmojiCatalog catalog;
@@ -449,9 +449,10 @@ void HelperTests::caretPlacementIsScaleIndependent() {
     const QPoint unscaled = window->pos();
     window->hidePalette();
 
-    // The same caret reported by a client rendering at 200 percent. Fcitx5
-    // reports device pixels, so the logical placement must not move.
-    window->showPalette(showRequest(10, {caretX * 2, caretY * 2, 4, 40}, 200));
+    // An absolute caret rectangle is already in the device pixels of the
+    // output that holds it, so the scale the client reports for itself must
+    // not take part in the conversion.
+    window->showPalette(showRequest(10, {caretX, caretY, 2, 20}, 200));
     QCOMPARE(window->pos(), unscaled);
 }
 

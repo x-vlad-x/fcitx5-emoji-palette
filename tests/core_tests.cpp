@@ -233,30 +233,44 @@ void testGeometry() {
 
 void testCaretConversion() {
     using emoji_palette::absentCaret;
-    using emoji_palette::logicalCaret;
+    using emoji_palette::logicalFromNative;
+    using emoji_palette::nativeOutputBounds;
     using emoji_palette::Rect;
     using emoji_palette::sanitizedCaret;
 
-    require(!logicalCaret(absentCaret, 100).has_value(),
-            "an absent caret rectangle must not be treated as a caret at the origin");
-    require(!logicalCaret({100, 100, 2, 20}, 49).has_value(), "a scale below the floor was used");
-    require(!logicalCaret({100, 100, 2, 20}, 401).has_value(),
-            "a scale above the ceiling was used");
-    require(!logicalCaret({emoji_palette::coordinateLimit + 1, 0, 2, 20}, 100).has_value(),
-            "an out-of-range caret rectangle was accepted");
+    // A single output at the origin: native pixels are logical pixels times
+    // the output scale.
+    const Rect primary{0, 0, 1280, 720};
+    require(nativeOutputBounds(primary, 100) == Rect{0, 0, 1280, 720},
+            "unscaled output bounds changed");
+    require(nativeOutputBounds(primary, 125) == Rect{0, 0, 1600, 900},
+            "125 percent output bounds failed");
+    require(nativeOutputBounds(primary, 150) == Rect{0, 0, 1920, 1080},
+            "150 percent output bounds failed");
+    require(nativeOutputBounds(primary, 200) == Rect{0, 0, 2560, 1440},
+            "200 percent output bounds failed");
 
-    require(logicalCaret({100, 200, 2, 20}, 100) == Rect{100, 200, 2, 20},
+    require(logicalFromNative({100, 200, 2, 20}, primary, 100) == Rect{100, 200, 2, 20},
             "unscaled conversion changed the rectangle");
-    require(logicalCaret({125, 250, 3, 25}, 125) == Rect{100, 200, 2, 20},
+    require(logicalFromNative({125, 250, 3, 25}, primary, 125) == Rect{100, 200, 2, 20},
             "125 percent conversion failed");
-    require(logicalCaret({150, 300, 3, 30}, 150) == Rect{100, 200, 2, 20},
+    require(logicalFromNative({150, 300, 3, 30}, primary, 150) == Rect{100, 200, 2, 20},
             "150 percent conversion failed");
-    require(logicalCaret({200, 400, 4, 40}, 200) == Rect{100, 200, 2, 20},
+    require(logicalFromNative({200, 400, 4, 40}, primary, 200) == Rect{100, 200, 2, 20},
             "200 percent conversion failed");
-    require(logicalCaret({-1920, -300, 3, 30}, 150) == Rect{-1280, -200, 2, 20},
-            "negative-origin conversion failed");
-    require(logicalCaret({151, 0, 0, 0}, 150) == Rect{101, 0, 0, 0},
+    require(logicalFromNative({151, 0, 0, 0}, primary, 150) == Rect{101, 0, 0, 0},
             "conversion did not round to the nearest logical pixel");
+
+    // Qt keeps an output origin in logical pixels and counts its native pixels
+    // from that same origin, so a secondary output left of the primary one
+    // must not be shifted by its own scale.
+    const Rect secondary{-1280, 0, 1280, 720};
+    require(nativeOutputBounds(secondary, 150) == Rect{-1280, 0, 1920, 1080},
+            "negative-origin output bounds failed");
+    require(logicalFromNative({-1280, 300, 3, 30}, secondary, 150) == Rect{-1280, 200, 2, 20},
+            "negative-origin conversion failed");
+    require(logicalFromNative({-380, 300, 3, 30}, secondary, 150) == Rect{-680, 200, 2, 20},
+            "negative-origin offset conversion failed");
 
     require(sanitizedCaret({10, 20, 2, 20}) == Rect{10, 20, 2, 20},
             "a valid caret rectangle was altered");
@@ -273,6 +287,7 @@ void testOutputSelection() {
     using emoji_palette::outputForCaret;
     using emoji_palette::Rect;
 
+    // Native-pixel bounds of three outputs, as nativeOutputBounds produces.
     const std::array<Rect, 3> outputs{Rect{-1920, 0, 1920, 1080}, Rect{0, 0, 2560, 1440},
                                       Rect{2560, 200, 1920, 1080}};
     const std::span<const Rect> view{outputs};

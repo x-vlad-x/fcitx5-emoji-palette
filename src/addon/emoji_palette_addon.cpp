@@ -290,14 +290,19 @@ class EmojiPaletteAddon final : public fcitx::AddonInstance {
 
     void sendShow(fcitx::InputContext& context, TransactionId transaction) {
         const auto& cursor = context.cursorRect();
-        const auto caret = emoji_palette::sanitizedCaret(
-            {cursor.left(), cursor.top(), cursor.width(), cursor.height()});
+        // A client that sets RelativeRect reports the caret relative to its own
+        // window. Only the compositor knows where that window is, so such a
+        // rectangle is not a usable absolute position for the helper.
+        const bool relative = context.capabilityFlags().test(fcitx::CapabilityFlag::RelativeRect);
+        const auto caret = relative
+                               ? emoji_palette::absentCaret
+                               : emoji_palette::sanitizedCaret({cursor.left(), cursor.top(),
+                                                                cursor.width(), cursor.height()});
         const auto scale = scalePercent(context.scaleFactor());
         EMOJI_PALETTE_PLACEMENT() << "Show frontend=" << std::string(context.frontendName())
                                   << " rawCaret=" << cursor.left() << "," << cursor.top() << ","
                                   << cursor.width() << "," << cursor.height()
-                                  << " scaleFactor=" << context.scaleFactor()
-                                  << " scalePercent=" << scale
+                                  << " relativeRect=" << relative << " clientScalePercent=" << scale
                                   << " caretUsable=" << (caret != emoji_palette::absentCaret);
         // Show::screen is reserved: Fcitx5 exposes no output geometry, so the
         // helper resolves the output from the caret or from the active output.

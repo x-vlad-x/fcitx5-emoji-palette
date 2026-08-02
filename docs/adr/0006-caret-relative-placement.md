@@ -23,9 +23,12 @@ That object is created from the Wayland connection that owns
 `zwp_input_method_v2`, so it is only reachable inside the Fcitx5 process, and
 the surface it positions must be rendered there too.
 
-The cursor rectangle that does arrive is expressed in the client's device
-pixels, paired with `InputContext::scaleFactor()`, while Qt, Wayland and
-layer-shell margins are all logical pixels.
+A cursor rectangle that does arrive is not always absolute. A client that sets
+`CapabilityFlag::RelativeRect`, which the Fcitx5 Qt module does for every
+Wayland client, reports the caret relative to its own window; only a compositor
+can resolve that. An absolute rectangle is expressed in the device pixels of
+the output that holds it, while Qt, Wayland and layer-shell margins are all
+logical pixels.
 
 ## Options
 
@@ -49,20 +52,30 @@ Selected.
 
 ## Decision
 
-The addon sanitizes the raw cursor rectangle, transmits it in device pixels
-together with the client scale factor, and transmits an empty rectangle at the
-origin when no usable position exists. It records the frontend name, the raw
+The addon transmits an absolute cursor rectangle in device pixels, and an empty
+rectangle at the origin whenever the client sets `RelativeRect` or reports no
+usable position. It also transmits the scale factor the client reports for
+itself, which is diagnostic only: an absolute rectangle already lives on the
+output's pixel grid, so the output scale governs the conversion. It records the frontend name, the raw
 rectangle, the scale factor and the resulting decision in the `emojipalette`
 log category, so the capture stage is diagnosable in the field without logging
 any search text or selected sequence. The helper records the converted caret,
 the chosen output and the final position under the
 `org.fcitx.EmojiPalette.placement` Qt logging category.
 
-The helper converts the rectangle to logical pixels, selects the output whose
-usable area contains the caret or else the nearest output, places the palette
-below the caret, flips it above when it does not fit, keeps the larger visible
-remainder when neither side fits, and clamps the result into the usable
-geometry of the chosen output.
+The helper resolves the output in device pixels first, using each output's
+logical geometry scaled by its own device pixel ratio, and picks the output
+containing the caret or else the nearest one. It then converts the rectangle
+into that output's logical pixels, places the palette below the caret, flips it
+above when it does not fit, keeps the larger visible remainder when neither
+side fits, and clamps the result into the usable geometry of that output.
+
+Qt places an output's origin in logical pixels and counts its native pixels
+from that same origin, so both conversions keep the origin and scale only the
+offset and the extent. On a multi-output layout whose outputs do not share one
+scale factor, the device-pixel layout an X11 or XWayland client sees is not a
+simple product of the logical layout; the nearest-output rule keeps such a
+caret on a real output rather than off-screen.
 
 When no caret rectangle is available, the palette is centered on the active
 output. On Wayland this uses an unanchored layer surface, which the compositor
@@ -84,3 +97,7 @@ The device-pixel to logical conversion, the output selection and the edge
 clamping are pure functions in the core library and are covered by tests at
 100, 125, 150 and 200 percent scaling, across multiple outputs, negative
 origins, gaps between outputs and every screen edge and corner.
+
+Clients that reach Fcitx5 through the Qt or GTK input-method modules on Wayland
+report a window-relative rectangle and therefore also receive the centered
+fallback, even though a rectangle is present.

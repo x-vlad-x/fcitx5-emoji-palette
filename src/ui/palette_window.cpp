@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <utility>
@@ -573,22 +574,37 @@ void PaletteWindow::chooseSequence(std::string_view sequence) {
     }
 }
 
+namespace {
+
+std::uint16_t outputScalePercent(const QScreen& screen) {
+    const auto percent = static_cast<int>(std::lround(screen.devicePixelRatio() * 100.0));
+    return static_cast<std::uint16_t>(std::clamp(percent, static_cast<int>(minimumScalePercent),
+                                                 static_cast<int>(maximumScalePercent)));
+}
+
+}
+
 void PaletteWindow::positionFor(const ipc::Show& request) {
     const auto screens = QGuiApplication::screens();
     if (screens.isEmpty()) {
         return;
     }
-    std::vector<Rect> outputs;
-    outputs.reserve(static_cast<std::size_t>(screens.size()));
+
+    // Fcitx5 reports an absolute caret in device pixels, so the output is
+    // resolved in that same space before anything is converted.
+    std::vector<Rect> nativeOutputs;
+    nativeOutputs.reserve(static_cast<std::size_t>(screens.size()));
     for (const auto* candidate : screens) {
-        const QRect usable = candidate->availableGeometry();
-        outputs.push_back({usable.x(), usable.y(), usable.width(), usable.height()});
+        const QRect logical = candidate->geometry();
+        nativeOutputs.push_back(
+            nativeOutputBounds({logical.x(), logical.y(), logical.width(), logical.height()},
+                               outputScalePercent(*candidate)));
     }
 
-    const auto caret = logicalCaret(request.caret, request.scalePercent);
+    const bool hasCaret = request.caret != absentCaret && isTransportableRect(request.caret);
     QScreen* screen = nullptr;
-    if (caret) {
-        if (const auto index = outputForCaret(*caret, outputs)) {
+    if (hasCaret) {
+        if (const auto index = outputForCaret(request.caret, nativeOutputs)) {
             screen = screens.at(static_cast<qsizetype>(*index));
         }
     }
@@ -605,26 +621,34 @@ void PaletteWindow::positionFor(const ipc::Show& request) {
         return;
     }
 
+    const QRect geometry = screen->geometry();
     const QRect available = screen->availableGeometry();
     const Size popup{std::min(width(), available.width()), std::min(height(), available.height())};
     resize(popup.width, popup.height);
     const Rect bounds{available.x(), available.y(), available.width(), available.height()};
+    std::optional<Rect> caret;
+    if (hasCaret) {
+        caret = logicalFromNative(request.caret,
+                                  {geometry.x(), geometry.y(), geometry.width(), geometry.height()},
+                                  outputScalePercent(*screen));
+    }
     const Point position =
         caret ? placePopup(*caret, popup, bounds).position : centeredPopup(popup, bounds);
 
     qCDebug(logPlacement).nospace()
         << "platform=" << QGuiApplication::platformName() << " rawCaret=" << request.caret.x << ","
         << request.caret.y << "," << request.caret.width << "," << request.caret.height
-        << " scalePercent=" << request.scalePercent << " logicalCaret="
+        << " clientScalePercent=" << request.scalePercent << " output=" << screen->name()
+        << " outputScalePercent=" << outputScalePercent(*screen) << " geometry=" << geometry
+        << " available=" << available << " logicalCaret="
         << (caret ? QStringLiteral("%1,%2,%3,%4")
                         .arg(caret->x)
                         .arg(caret->y)
                         .arg(caret->width)
                         .arg(caret->height)
                   : QStringLiteral("absent"))
-        << " output=" << screen->name() << " geometry=" << screen->geometry()
-        << " available=" << available << " popup=" << popup.width << "x" << popup.height
-        << " position=" << position.x << "," << position.y;
+        << " popup=" << popup.width << "x" << popup.height << " position=" << position.x << ","
+        << position.y;
 
     winId();
     if (QGuiApplication::platformName().startsWith(QStringLiteral("wayland"))) {
@@ -641,8 +665,7 @@ void PaletteWindow::positionFor(const ipc::Show& request) {
                 layer->setScreen(screen);
                 // Layer-shell margins are measured from the anchored edges of
                 // the output itself, not from the panel-adjusted area.
-                layer->setMargins({position.x - screen->geometry().x(),
-                                   position.y - screen->geometry().y(), 0, 0});
+                layer->setMargins({position.x - geometry.x(), position.y - geometry.y(), 0, 0});
             } else {
                 // An unanchored layer surface is centered by the compositor on
                 // the output it is assigned to.
